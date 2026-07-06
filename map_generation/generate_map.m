@@ -1,6 +1,7 @@
 close all; clc; 
 
-
+addpath(fullfile('..','..','Matlab','utils/'))
+addpath(fullfile('..','..','Matlab','plottings/'))
 % Load data
 filename = fullfile('..','..','Matlab','SkovdeFlightData');
 load(filename);
