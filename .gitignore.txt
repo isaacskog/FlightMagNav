@@ -1,9 +1,0 @@
-*.asv
-*.m~
-*.mat
-*.fig
-results/
-figures/
-.vscode/
-.DS_Store
-Thumbs.db
