@@ -12,6 +12,9 @@ settings=get_settings();
 % Fit model
 model = fit_mag_map_model(data,settings);
 
+
+
+
 % Plot filter results
 plot_filter_parameters(model)
 
