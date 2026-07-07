@@ -29,3 +29,7 @@ plot_mag_map(model,'sgu','sgudata.mat')
 
 % Plot validation results
 plot_filter_parameters(model.val_obs,model.validInfo)
+
+
+
+plot_ref_mag(data,model,settings,true)

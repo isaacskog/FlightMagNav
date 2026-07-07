@@ -21,9 +21,9 @@ settings.map.sigma = 12.4548;                                               % Pr
 settings.map.length_scale =-2*pi*50/log(0.01);                              % Length scale used in the basis functions [m]
 settings.time.sigma_q = 0;                                                  % Random walk noise [nT/s] for modeling temporal variations
 settings.time.sigma_g0 = 30;                                                % Prior uncertainty (std) on the temporal variation bias [nT]. This also captures total changes in the field level between the flights. 
-settings.noise.sigma = [1.5884 3.3108 1.7227 1.7500]';                     % Measurement noise/model error standard deviation [nT] for the different flights 
+settings.noise.sigma = [1.1787 3.2443 1.0154 1.5326]';                     % Measurement noise/model error standard deviation [nT] for the different flights 
 settings.calibration.sigma_ori = 1e-4;                                      % Prior uncertainty (std) on the orientation dependent biases [-]
 settings.calibration.sigma_back_bias = 1;                                   % Prior uncertainty (std) on the biases between front and back sensor [nT]
-settings.noise.sigma_validation=2.2;
+settings.noise.sigma_validation=2.4;
 
 end
