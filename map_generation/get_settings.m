@@ -7,7 +7,7 @@ settings.reference_lla=[58.2952919010000;...                                % Re
     13.9020338060000;...
     166.931992000000];
 settings.fs_map = 0.5;                                                      % Sampling frequency [Hz] of the data used to create the map. The raw data is low-pass filtered and down sampled to this.  
-settings.altitude_min = 30;                                                 % Min altitude [m] relative the starting altitude for the data used in the map creation     
+settings.altitude_min = 50;                                                 % Min altitude [m] relative the starting altitude for the data used in the map creation     
 settings.pos_front_mag = -1e-3*[958/2+52/2-30 0 0];                         % Position of front sensor in the platform coordinate [m]
 settings.pos_back_mag = 1e-3*[958/2-52/2-30 0 0];                           % Position of back sensor in the platform coordinate [m]
 settings.B_e_ned = wrldmagm( ...                                            % Fixed part of the magnetic field
@@ -24,5 +24,6 @@ settings.time.sigma_g0 = 30;                                                % Pr
 settings.noise.sigma = [1.5884 3.3108 1.7227 1.7500]';                     % Measurement noise/model error standard deviation [nT] for the different flights 
 settings.calibration.sigma_ori = 1e-4;                                      % Prior uncertainty (std) on the orientation dependent biases [-]
 settings.calibration.sigma_back_bias = 1;                                   % Prior uncertainty (std) on the biases between front and back sensor [nT]
+settings.noise.sigma_validation=2.2;
 
 end

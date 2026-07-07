@@ -8,7 +8,7 @@ function model = fit_mag_map_model(data,settings)
 
 
 % Extract the observations need to build the map
-[obs,validations_obs] = build_observation_data(data,settings);
+[obs,validation_obs] = build_observation_data(data,settings);
 
 % Build the basis
 basis = build_map_basis(obs,settings);
@@ -45,9 +45,6 @@ end
 [NlogL,theta,P,filterInfo] = run_kalman_filter(obs,basis,paramInfo,settings); %#ok<ASGLU>
 
 
-% Run the validation 
-%validInfo=run_validation(validation_obs,basis,paramInfo,theta,P,settings);
-
 % Save the result into a struct
 model = struct();
 model.theta = theta;
@@ -56,11 +53,19 @@ model.paramInfo = paramInfo;
 model.basis = basis;
 model.settings = settings;
 model.obs = obs;
+model.val_obs = validation_obs;
 model.filterInfo = filterInfo;
 model.predict_map = @(r_ned) predict_map(r_ned,theta,P,basis,paramInfo);
 model.predict_map_lla = @(lat,lon,alt) ...
     predict_map(lla_to_local_ned(lat,lon,alt,settings.reference_lla), ...
     theta,P,basis,paramInfo);
+
+
+% Run the validation 
+model.validInfo=run_validation(validation_obs,model);
+
+
+
 end
 
 
