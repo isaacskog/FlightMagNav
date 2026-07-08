@@ -67,6 +67,10 @@ for ii = 1:nPlot
 
     t = data(k).ref_mag.time;
     B = data(k).ref_mag.tot_field;
+    t_ups=data(k).UPS_ref_mag.time;
+    B_ups=data(k).UPS_ref_mag.tot_field;
+    
+
 
     valid = ~isnat(t) & ~isnan(B);
     t = t(valid);
@@ -75,20 +79,33 @@ for ii = 1:nPlot
     if doFiltering
         [tPlot,BPlot] = filter_ref_mag_for_plotting(t,B);
 
+        idx=tPlot>obs.time(1) & tPlot<obs.time(end);
+        tPlot=tPlot(idx);
+        BPlot=BPlot(idx);
+
+
+        idx=t_ups>obs.time(1) & t_ups<obs.time(end);
+        t_ups=t_ups(idx);
+        B_ups=B_ups(idx);
+
         % Plot relative variation to make slow drift easier to compare.
-        plot(tPlot,BPlot - BPlot(1),'LineWidth',1.2);
+        plot(tPlot,BPlot - BPlot(1),'k','LineWidth',1.2);
+         plot(t_ups,B_ups - B_ups(1),'r','LineWidth',1.2);
         title(sprintf('Flight %d, LP 0.05 Hz, 1 Hz',k));
         ylabel('\Delta field [nT]');
+
 
     else
         plot(t,B,'LineWidth',1.2);
         title(sprintf('Flight %d',k));
         ylabel('Field [nT]');
     end
-    xlim([obs.time(1) obs.time(end)])
+
     if ii > (nRows-1)*nCols
         xlabel('Time (UTC)');
     end
+    ylim([-5 5])
+    legend('Reference magnetometers','Uppsala reference magnetometer')
 end
 
 if doFiltering

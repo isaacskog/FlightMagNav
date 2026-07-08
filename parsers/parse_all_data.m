@@ -33,7 +33,7 @@ startandstoptimes=...
 
 
 %% Parse all data
-data=repmat(struct('ref_mag',[],'front_mag',[],'back_mag',[],'GPSaidedINS',[]),1,numel(folders));
+data=repmat(struct('ref_mag',[],'front_mag',[],'back_mag',[],'GPSaidedINS',[],'UPS_ref_mag',[]),1,numel(folders));
 for ii=1:numel(folders)
     
     disp(['Data set ' num2str(ii) ' out of ' num2str(numel(folders))]);
@@ -46,6 +46,10 @@ for ii=1:numel(folders)
     % Reference magnetometers
     filename = fullfile('..','..',folders{ii},'RefMag.txt');
     data(ii).ref_mag = parse_ref_mag_data(filename,data(ii).GPSaidedINS.time);
+
+    % Reference magnetometers
+    filename = fullfile('..','..',folders{ii},'ups_ref.sec');
+    data(ii).UPS_ref_mag = parse_ups_ref_mag_data(filename,data(ii).GPSaidedINS.time);
 
     % Front magnetometer
     filename = fullfile('..','..',folders{ii},'FrontMag.txt');
