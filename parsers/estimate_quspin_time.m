@@ -147,7 +147,7 @@ function [tCorrected,delayInfo] = estimate_quspin_time( ...
     tau = delayTime - t0;
 
     [clockFit,fitStats] = robustfit( ...
-        tau(valid),delayRaw(valid),'cauchy');
+        tau(valid),delayRaw(valid),'bisquare');
 
     beta = clockFit(1);
     clockDrift = clockFit(2);

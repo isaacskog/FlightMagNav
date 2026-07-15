@@ -16,6 +16,5 @@ H(1,paramInfo.flight(flightNumber).idx_ori_front) = z;
 H(1,paramInfo.flight(flightNumber).idx_g) = 1;
 H(2,paramInfo.idx_map) = Phi_back;
 H(2,paramInfo.flight(flightNumber).idx_ori_back) = z;
-H(2,paramInfo.flight(flightNumber).idx_back_bias) = 1;
 H(2,paramInfo.flight(flightNumber).idx_g) = 1;
 end

@@ -39,11 +39,10 @@ end
 function obs=extract_data(data,settings)
 
 
-
-
 % Design low pass filter    
 fsIn = 100;
 fc = 0.45*settings.fs_map;
+fc_temporal=0.01;
 filterOrder = 3;
 [b,a] = butter(filterOrder,fc/(fsIn/2),'low');
 
@@ -67,6 +66,23 @@ rBody = lla_to_local_ned( ...
     settings.reference_lla);
 
 q = interp1(tIn,ins.quaternion,tOut,'nearest');
+
+
+% Compensate for temporal variations
+if isempty(data.ref_mag)
+    B=interp1(tIn,data.UPS_ref_mag.tot_field,tOut,"nearest");
+    dB=B-B(1);
+else
+
+    [b,a] = butter(filterOrder,fc_temporal/(fsIn/2),'low');
+    B=filtfilt(b,a,data.ref_mag.tot_field);
+    B=interp1(tIn,B,tOut,"nearest");
+    dB=B-B(1);
+end
+
+yFront=yFront-dB;
+yBack=yBack-dB;
+
 
 % Get the index of the data points above the specified minimum
 % height

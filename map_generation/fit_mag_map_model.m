@@ -71,12 +71,15 @@ end
 
 function theta0 = get_init(settings)
 %Initial log-hyperparameter vector theta.
-    theta0 = log(settings.noise.sigma);
+    theta0 = [log(settings.noise.sigma); log(settings.map.sigma); log(settings.time.sigma_g0); log(settings.calibration.sigma_ori)];
 end
 
 function settings = complete_settings(settings,theta)
 % Update settings with the values in theta 
-        settings.noise.sigma=exp(theta);
+        settings.noise.sigma=exp(theta(1:4));
+        settings.map.sigma=exp(theta(5));
+        settings.time.sigma_g0=exp(theta(6));
+        settings.calibration.sigma_ori=exp(theta(7));
 end
 
 
@@ -88,11 +91,9 @@ function paramInfo = build_parameter_info(settings,basis)
 %       theta_map
 %       theta_ori_front_1
 %       theta_ori_back_1
-%       b_back_1
 %       ...
 %       theta_ori_front_M
 %       theta_ori_back_M
-%       b_back_M
 %       g_1
 %       ...
 %       g_M
@@ -117,9 +118,6 @@ function paramInfo = build_parameter_info(settings,basis)
 
         paramInfo.flight(ii).idx_ori_back = next:(next+2);
         next = next + 3;
-
-        paramInfo.flight(ii).idx_back_bias = next;
-        next = next + 1;
     end
 
     for ii = 1:nFlights

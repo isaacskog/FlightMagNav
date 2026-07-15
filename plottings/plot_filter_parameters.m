@@ -62,22 +62,6 @@ end
         xlim([t(2) t(end)])
     end
 
-    % Sensor bias.
-    figure()
-    clf
-    for ii = 1:nFlight
-        subplot(nFlight,1,ii)
-        t = obs(ii).t_sec(:);
-        mu = filter_par(ii).bias(:);
-        sig = sqrt(max(filter_par(ii).bias_var(:),0));
-
-        plot_state_with_2sigma(t,mu,sig)
-        grid minor
-        xlabel('Time [s]')
-        ylabel('Bias')
-        title(sprintf('Flight %d: Sensor bias',ii))
-    end
-
     % Front orientation bias.
     figure()
     clf
