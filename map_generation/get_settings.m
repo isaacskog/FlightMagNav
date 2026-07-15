@@ -1,6 +1,6 @@
 function settings = get_settings()
 
-settings.tune_hyper_par=true;                                              % Turn on optimization of hyperparameters (in this case the measurement noise variance)
+settings.tune_hyper_par=false;                                              % Turn on optimization of hyperparameters (in this case the measurement noise variance)
 settings.idx=2:5;                                                           % Flights to use for the map creation. Flights 1-5 follow a lawnmower pattern 
 settings.idx_validation_data_set=6;                                         % Data set used for validation of the quality of the learned map   
 settings.reference_lla=[58.2952919010000;...                                % Reference location (lat,lon, altitude)

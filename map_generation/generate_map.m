@@ -14,8 +14,7 @@ model = fit_mag_map_model(data,settings);
 
 
 % Plot heights
-%plot_trajectory_heights(model);
-
+plot_trajectory_heights(model);
 
 % Plot filter results
 plot_filter_parameters(model.obs,model.filterInfo)
@@ -31,5 +30,7 @@ plot_mag_map(model,'sgu','sgudata.mat')
 plot_filter_parameters(model.val_obs,model.validInfo)
 
 
+disp(model.validInfo.sigma_validation)
 
-%plot_ref_mag(data,model,settings,true)
+% Save the results
+save("GeneratedModel","model");

@@ -1,4 +1,4 @@
-function [x,P,logL,NIS] = step_kf(y,x,P,ssm)
+function [x,P,logL,NIS,normalizedInnovation] = step_kf(y,x,P,ssm)
 
 
 % Innovation covariance
@@ -8,7 +8,11 @@ S = ssm.H*P*ssm.H' + ssm.R;
 z = y - ssm.H*x;
 
 % Normalized innovation squared 
-NIS = z'*(S\z);
+L = chol(S,'lower');
+zWhite = L\z;
+NIS = sum(zWhite.^2);
+
+normalizedInnovation = z./sqrt(diag(S));
 
 % Kalman gain
 K = (P*ssm.H')/S;

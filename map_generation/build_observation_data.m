@@ -88,6 +88,12 @@ yBack=yBack-dB;
 % height
 idx = -rBody(:,3) >= settings.altitude_min;
 
+if ~any(idx)
+    warning('Uses an altitude treshold of median(height)-5 meters') 
+   idx = -rBody(:,3) >= (median(-rBody(:,3))-5);
+end
+
+
 % Store the data
 obs.time = ins.time(1) + seconds(tOut(idx));
 obs.t_sec = tOut(idx);
