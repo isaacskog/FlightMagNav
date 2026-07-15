@@ -47,17 +47,34 @@ for ii=1:numel(folders)
     filename = fullfile('..','..',folders{ii},'RefMag.txt');
     data(ii).ref_mag = parse_ref_mag_data(filename,data(ii).GPSaidedINS.time);
 
-    % Reference magnetometers
+    % Uppsala reference magnetometers
     filename = fullfile('..','..',folders{ii},'ups_ref.sec');
     data(ii).UPS_ref_mag = parse_ups_ref_mag_data(filename,data(ii).GPSaidedINS.time);
 
     % Front magnetometer
     filename = fullfile('..','..',folders{ii},'FrontMag.txt');
-    data(ii).front_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS.time);
+    data(ii).front_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS);
 
     % Back magnetometer
     filename = fullfile('..','..',folders{ii},'BackMag.txt');
-    data(ii).back_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS.time);
+    data(ii).back_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS);
+
+
+    % figure(1)
+    % clf
+    % plot(data(ii).front_mag.tot_field)
+    % hold on;
+    % plot(data(ii).back_mag.tot_field,'r')
+    % 
+    % 
+    % figure(2)
+    % clf
+    % plot(data(ii).front_mag.delay_info.time,data(ii).front_mag.delay_info.delay)
+    % 
+    % figure(3)
+    % clf
+    % plot(data(ii).back_mag.delay_info.time,data(ii).back_mag.delay_info.delay)
+    % pause
 end
 
 %% Save the data
