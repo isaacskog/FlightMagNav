@@ -60,21 +60,26 @@ for ii=1:numel(folders)
     data(ii).back_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS);
 
 
+
+
+    
     % figure(1)
     % clf
-    % plot(data(ii).front_mag.tot_field)
-    % hold on;
-    % plot(data(ii).back_mag.tot_field,'r')
-    % 
+    % plot(data(ii).front_mag.delay_info.time, ...
+    %  data(ii).front_mag.delay_info.delay_raw,'o')
+    % hold on
+    % plot(data(ii).front_mag.delay_info.time, ...
+    %     data(ii).front_mag.delay_info.delay,'-')
+    % title('Front mag')
     % 
     % figure(2)
     % clf
-    % plot(data(ii).front_mag.delay_info.time,data(ii).front_mag.delay_info.delay)
-    % 
-    % figure(3)
-    % clf
-    % plot(data(ii).back_mag.delay_info.time,data(ii).back_mag.delay_info.delay)
-    % pause
+    %    plot(data(ii).back_mag.delay_info.time, ...
+    %  data(ii).back_mag.delay_info.delay_raw,'o')
+    %    hold on
+    %    plot(data(ii).back_mag.delay_info.time, ...
+    %        data(ii).back_mag.delay_info.delay,'-')
+    % title('Back mag')
 end
 
 %% Save the data
