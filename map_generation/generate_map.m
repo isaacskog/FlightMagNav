@@ -12,7 +12,6 @@ settings=get_settings();
 % Fit model
 model = fit_mag_map_model(data,settings);
 
-
 % Plot heights
 plot_trajectory_heights(model);
 
@@ -29,8 +28,8 @@ plot_mag_map(model,'sgu','sgudata.mat')
 % Plot validation results
 plot_filter_parameters(model.val_obs,model.validInfo)
 
-
 disp(model.validInfo.sigma_validation)
 
 % Save the results
-save("GeneratedModel","model");
+timestamp = string(datetime('now','Format','yyyyMMdd_HHmmss'));
+save("GeneratedModel_" + timestamp + ".mat", "model");

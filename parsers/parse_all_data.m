@@ -31,10 +31,12 @@ startandstoptimes=...
                 datetime(2026,6,11,12,52,0,0,"TimeZone","UTC") datetime(2026,6,11,13,03,0,0,"TimeZone","UTC");... % 7
     ];
 
+% Data from references sensor okay
+ref_sensor_meas_okay=logical([0 0 1 1 1 1 0 1]);
 
 %% Parse all data
 data=repmat(struct('ref_mag',[],'front_mag',[],'back_mag',[],'GPSaidedINS',[],'UPS_ref_mag',[]),1,numel(folders));
-for ii=1:numel(folders)
+parfor ii=1:numel(folders)
     
     disp(['Data set ' num2str(ii) ' out of ' num2str(numel(folders))]);
 
@@ -44,8 +46,10 @@ for ii=1:numel(folders)
     data(ii).GPSaidedINS=parse_gps_aided_ins_data(filename,startandstoptimes(ii,1),startandstoptimes(ii,2));
  
     % Reference magnetometers
-    filename = fullfile('..','..',folders{ii},'RefMag.txt');
-    data(ii).ref_mag = parse_ref_mag_data(filename,data(ii).GPSaidedINS.time);
+    if ref_sensor_meas_okay(ii)
+        filename = fullfile('..','..',folders{ii},'RefMag.txt');
+        data(ii).ref_mag = parse_ref_mag_data(filename,data(ii).GPSaidedINS.time);
+    end
 
     % Uppsala reference magnetometers
     filename = fullfile('..','..',folders{ii},'ups_ref.sec');
@@ -58,10 +62,6 @@ for ii=1:numel(folders)
     % Back magnetometer
     filename = fullfile('..','..',folders{ii},'BackMag.txt');
     data(ii).back_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS);
-
-
-
-
     
     % figure(1)
     % clf
