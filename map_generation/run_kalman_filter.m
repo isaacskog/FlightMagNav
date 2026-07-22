@@ -26,11 +26,12 @@ end
 NlogL_tot = 0;
 
 % Structure of output data beyond the map parameters
-filter_par = repmat(struct('NIS',[],'g',[],'g_var',[],'ori_bias_front',[],'ori_bias_front_cov_diag',[],'ori_bias_back',[],'ori_bias_back_cov_diag',[]),1,numel(obs));
+filter_par = repmat(struct('flight_index',[],'NIS',[],'g',[],'g_var',[],'ori_bias_front',[],'ori_bias_front_cov_diag',[],'ori_bias_back',[],'ori_bias_back_cov_diag',[]),1,numel(obs));
 
 for ii = 1:numel(obs)
 
     % Allocate memory and store initial values
+    filter_par(ii).flight_index=settings.idx(ii);
     filter_par(ii).NIS = zeros(size(obs(ii).y,1),1);
     filter_par(ii).g = zeros(size(obs(ii).y,1),1);
     filter_par(ii).g_var = zeros(size(obs(ii).y,1),1);

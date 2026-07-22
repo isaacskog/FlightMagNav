@@ -19,6 +19,8 @@ paramInfo = build_parameter_info(settings,basis);
 % Check if hyperparamters should be tuned
 if(settings.tune_hyper_par)
 
+       fprintf('\nTunes hyperparameters \n');
+
     % Set up optimization algorithm
     options = optimoptions('fminunc', ...
         'Algorithm','quasi-newton', ...
@@ -42,6 +44,7 @@ if(settings.tune_hyper_par)
 end
 
 % Run the map learning 
+ fprintf('\n Learns map \n');
 [NlogL,theta,P,filterInfo] = run_kalman_filter(obs,basis,paramInfo,settings); %#ok<ASGLU>
 
 
@@ -56,15 +59,10 @@ model.obs = obs;
 model.val_obs = validation_obs;
 model.filterInfo = filterInfo;
 model.predict_map = @(r_ned) predict_map(r_ned,theta,P,basis,paramInfo);
-model.predict_map_lla = @(lat,lon,alt) ...
-    predict_map(lla_to_local_ned(lat,lon,alt,settings.reference_lla), ...
-    theta,P,basis,paramInfo);
-
 
 % Run the validation 
-model.validInfo=run_validation(validation_obs,model);
-
-
+ fprintf('\n Runs validation \n');
+model.validInfo=run_validation(model);
 
 end
 

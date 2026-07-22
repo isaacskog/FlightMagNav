@@ -1,7 +1,12 @@
-function r = lla_to_local_ned(lat,lon,alt,refLLA)
+function r = lla_to_local_ned(lla,refLLA)
 % Small-area WGS84 to local NED conversion.
 
+
+
 R = 6378137;
+lat=lla(:,1);
+lon=lla(:,2);
+alt=lla(:,3); 
 lat0 = refLLA(1);
 lon0 = refLLA(2);
 alt0 = refLLA(3);

@@ -1,42 +1,42 @@
-function plot_mag_map(model,mapSource,sguMatFile)
-%PLOT_MAG_MAP Plot estimated magnetic map or SGU magnetic data.
+function plot_mag_map(model,saveFigures)
+%PLOT_MAG_MAP Plot the learned magnetic anomaly map and its uncertainty.
 %
 % Usage:
 %   plot_mag_map(model)
-%   plot_mag_map(model,'model')
-%   plot_mag_map(model,'sgu','SGU_data.mat')
+%   plot_mag_map(model,true)
 %
 % Inputs:
 %   model
 %       Output from fit_mag_map_model().
 %
-%   mapSource
-%       'model' : plot the estimated map from model.predict_map().
-%       'sgu'   : plot SGU data loaded from sguMatFile.
-%
-%   sguMatFile
-%       MAT-file containing variable y with columns:
-%           y(:,1) = projected easting  [m]
-%           y(:,2) = projected northing [m]
-%           y(:,3) = magnetic field     [nT]
+%   saveFigures
+%       Logical flag. If true, only the learned magnetic anomaly map is
+%       exported as a tightly cropped vector PDF for publication.
+%       Default: false.
 
-if nargin < 2 || isempty(mapSource)
-    mapSource = 'model';
+if nargin < 2 || isempty(saveFigures)
+    saveFigures = false;
 end
 
-mapSource = lower(string(mapSource));
+fontSize = 14;
+gridRes = 5;
+anomalyClim = [-70 70];
+uncertaintyClim = [0.5 2];
+maxMapStd = 1.2; % Maximum posterior standard deviation shown in map [nT]
 
-% Collect flight-track points in local NED.
+outputFolder = fullfile( ...
+    '..','..','Matlab','publication_figures');
+
+% Collect flight-track points in local NED coordinates.
 rTrack = [];
-
 for ii = 1:numel(model.obs)
     rTrack = [rTrack; model.obs(ii).r_ned(:,1:2)]; %#ok<AGROW>
 end
 
-% Convex hull of mapped area in local NED coordinates.
+% Convex hull of the area covered by the mapping flights.
 kHull = convhull(rTrack(:,1),rTrack(:,2));
 
-% Use same local grid for model and SGU map.
+% Create a local evaluation grid.
 centers = model.basis.map.centers;
 
 nMin = min(centers(:,1));
@@ -44,238 +44,165 @@ nMax = max(centers(:,1));
 eMin = min(centers(:,2));
 eMax = max(centers(:,2));
 
-gridRes = 5;
-
 north = nMin:gridRes:nMax;
 east  = eMin:gridRes:eMax;
-
 [N,E] = meshgrid(north,east);
 
-% Grid points inside flight-covered area.
 inside = inpolygon( ...
     N(:), ...
     E(:), ...
     rTrack(kHull,1), ...
     rTrack(kHull,2));
 
-figure;
-clf;
-hold on;
+% Predict map mean and variance.
+r = [N(:),E(:),zeros(numel(N),1)];
+[B,sigma2] = model.predict_map(r);
+sigma = sqrt(sigma2);
 
-switch mapSource
+%% Learned magnetic anomaly map
 
-    case "model"
+% Only plot map values where the posterior standard deviation is below
+% the selected threshold.
+idxModel = ...
+    inside & ...
+    ~isnan(B) & ...
+    ~isnan(sigma) & ...
+    sigma < maxMapStd;
 
-        r = [N(:),E(:),zeros(numel(N),1)];
+Bmodel = B(idxModel);
+Bmodel = Bmodel - mean(Bmodel,'omitnan');
 
-        [B,sigma2] = model.predict_map(r);
+figModel = create_map_figure();
+axModel = axes(figModel);
+hold(axModel,'on');
 
-        idx = inside & ~isnan(B);
+scatter( ...
+    axModel, ...
+    E(idxModel), ...
+    N(idxModel), ...
+    10, ...
+    Bmodel, ...
+    'filled');
 
-        Bplot = B(idx);
-        Bplot = Bplot - mean(Bplot,'omitnan');
+plot_flight_tracks(axModel,model.obs);
 
+format_map_axes( ...
+    axModel, ...
+    'Learned magnetic anomaly map', ...
+    'Magnetic anomaly [nT]', ...
+    anomalyClim, ...
+    fontSize, ...
+    [eMin eMax], ...
+    [nMin nMax]);
 
-        scatter( ...
-            E(idx), ...
-            N(idx), ...
-            10, ...
-            Bplot, ...
-            'filled');
+%% Posterior standard deviation
 
-        cb = colorbar;
-        cb.Label.String = 'Predicted map [nT]';
+% The uncertainty figure is shown for analysis, but is not exported.
+idxUncertainty = inside & ~isnan(sigma);
 
-        title('Estimated magnetic map');
-        clim([-70 70])
+figUncertainty = create_map_figure();
+axUncertainty = axes(figUncertainty);
+hold(axUncertainty,'on');
 
+scatter( ...
+    axUncertainty, ...
+    E(idxUncertainty), ...
+    N(idxUncertainty), ...
+    10, ...
+    sigma(idxUncertainty), ...
+    'filled');
 
-        colormap turbo
+plot_flight_tracks(axUncertainty,model.obs);
 
-        % Overlay flight tracks.
-        plot_flight_tracks(model.obs)
+format_map_axes( ...
+    axUncertainty, ...
+    'Uncertainty in the learned magnetic map', ...
+    'Posterior standard deviation [nT]', ...
+    uncertaintyClim, ...
+    fontSize, ...
+    [eMin eMax], ...
+    [nMin nMax]);
 
-        xlabel('East [m]');
-        ylabel('North [m]');
+%% Export publication figure
 
-        axis equal
-        grid on
+if saveFigures
+    if ~exist(outputFolder,'dir')
+        mkdir(outputFolder);
+    end
 
-
-
-        figure
-        clf;
-        hold on;
-        sigma=sqrt(sigma2(idx));
-
-        scatter( ...
-            E(idx), ...
-            N(idx), ...
-            10, ...
-            sigma, ...
-            'filled');
-
-        cb = colorbar;
-        cb.Label.String = 'Uncertinaty predicted map, mean removed [nT]';
-
-
-        colormap turbo
-
-        % Overlay flight tracks.
-        plot_flight_tracks(model.obs)
-
-        xlabel('East [m]');
-        ylabel('North [m]');
-
-        axis equal
-        grid on
-         title('Uncertinaty in estimated magnetic map');
-
-    case "sgu"
-
-        if nargin < 3 || isempty(sguMatFile)
-            error('For SGU plotting, provide sguMatFile.');
-        end
-
-        S = load(sguMatFile);
-        y = S.y;
-
-        % Convert SGU projected coordinates to local east/north.
-        refXY = get_reference_sgu_xy(model);
-
-        eastSGU  = y(:,1) - refXY(1);
-        northSGU = y(:,2) - refXY(2);
-        Bsgu     = y(:,3);
-
-        % Keep only SGU points in a bounding box around the mapped area.
-        % This avoids building scatteredInterpolant from the full SGU
-        % data set, which can be slow.
-        bboxMargin = 2*model.settings.map.center_spacing;
-
-        nBoxMin = min(rTrack(:,1)) - bboxMargin;
-        nBoxMax = max(rTrack(:,1)) + bboxMargin;
-        eBoxMin = min(rTrack(:,2)) - bboxMargin;
-        eBoxMax = max(rTrack(:,2)) + bboxMargin;
-
-        idxBox = ...
-            northSGU >= nBoxMin & northSGU <= nBoxMax & ...
-            eastSGU  >= eBoxMin & eastSGU  <= eBoxMax;
-
-        eastSGU  = eastSGU(idxBox);
-        northSGU = northSGU(idxBox);
-        Bsgu     = Bsgu(idxBox);
-
-        % Build SGU interpolant using only nearby SGU data.
-        F = scatteredInterpolant( ...
-            eastSGU, ...
-            northSGU, ...
-            Bsgu, ...
-            'linear', ...
-            'none');
-
-        % Interpolate SGU data only at grid points inside the mapped
-        % area. This avoids evaluating the interpolant on unnecessary
-        % grid points.
-        Einside = E(inside);
-        Ninside = N(inside);
-
-        Binside = F(Einside,Ninside);
-
-        idx = ~isnan(Binside);
-
-        Bplot = Binside(idx);
-        Bplot = Bplot - mean(Bplot,'omitnan');
-
-        scatter( ...
-            Einside(idx), ...
-            Ninside(idx), ...
-            10, ...
-            Bplot, ...
-            'filled');
-
-        cb = colorbar;
-        cb.Label.String = 'SGU magnetic field, mean removed [nT]';
-
-        title('Low resolution SGU magnetic map');
-        clim([-70 70])
-
-
-        colormap turbo
-
-
-        % Overlay flight tracks.
-        plot_flight_tracks(model.obs)
-
-        xlabel('East [m]');
-        ylabel('North [m]');
-
-        axis equal
-        grid on
-
-
-
-    otherwise
-
-        error('Unknown mapSource. Use ''model'' or ''sgu''.');
+    export_figure_pdf( ...
+        figModel, ...
+        fullfile(outputFolder,'learned_magnetic_anomaly_map.pdf'));
 end
-
-
-
 
 end
 
 
-function refXY = get_reference_sgu_xy(model)
-%GET_REFERENCE_SGU_XY Project reference_lla to SGU coordinate system.
-%
-% Uses the user's sweref() function.
-%
-% Input:
-%   model.settings.reference_lla = [lat0 lon0 alt0]
-%
-% Output:
-%   refXY = [E0 N0]
+function fig = create_map_figure()
+%CREATE_MAP_FIGURE Create a consistently sized publication figure.
 
-lat0 = model.settings.reference_lla(1);
-lon0 = model.settings.reference_lla(2);
-
-[NArray,EArray,~] = sweref(lat0,lon0,0);
-
-refXY = [EArray NArray];
+fig = figure( ...
+    'Color','w', ...
+    'Units','centimeters', ...
+    'Position',[2 2 16 14]);
 end
 
 
-function plot_flight_tracks(obs)
-%PLOT_FLIGHT_TRACKS Plot flight tracks with distinct dark colors and labels.
+function format_map_axes( ...
+    ax,plotTitle,colorbarLabel,colorLimits,fontSize,xLimits,yLimits)
+%FORMAT_MAP_AXES Apply common formatting to a magnetic-map figure.
 
-nFlight = numel(obs);
+xlabel(ax,'East [m]');
+ylabel(ax,'North [m]');
+title(ax,plotTitle);
+
+axis(ax,'equal');
+xlim(ax,xLimits);
+ylim(ax,yLimits);
+grid(ax,'on');
+box(ax,'on');
+
+ax.FontSize = fontSize;
+ax.Layer = 'top';
+
+colormap(ax,turbo);
+
+if ~isempty(colorLimits)
+    clim(ax,colorLimits);
+end
+
+cb = colorbar(ax);
+cb.Label.String = colorbarLabel;
+cb.FontSize = fontSize;
+cb.Label.FontSize = fontSize;
+
+drawnow;
+end
 
 
+function export_figure_pdf(fig,fileName)
+%EXPORT_FIGURE_PDF Export a tightly cropped vector PDF.
 
-for ii = 1:nFlight
+exportgraphics( ...
+    fig, ...
+    fileName, ...
+    'ContentType','vector', ...
+    'BackgroundColor','white');
+end
 
+
+function plot_flight_tracks(ax,obs)
+%PLOT_FLIGHT_TRACKS Overlay flight tracks.
+
+for ii = 1:numel(obs)
     east  = obs(ii).r_ned(:,2);
     north = obs(ii).r_ned(:,1);
 
     plot( ...
+        ax, ...
         east, ...
         north, ...
-        'k', ...
-        'LineWidth',1.5);
-
-    % Put label near the middle of the track.
-    kk = round(numel(east)/2);
-
-    text( ...
-        east(kk), ...
-        north(kk), ...
-        sprintf('%d',ii), ...
-        'FontWeight','bold', ...
-        'FontSize',10, ...
-        'HorizontalAlignment','center', ...
-        'VerticalAlignment','middle', ...
-        'BackgroundColor','w', ...
-        'Margin',1);
-
+        'Color',[0.4 0.4 0.4], ...
+        'LineWidth',0.6);
 end
 end

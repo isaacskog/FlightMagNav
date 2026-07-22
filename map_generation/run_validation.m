@@ -1,5 +1,43 @@
-function filter_par = run_validation(obs,model)
-%RUN_VALIDATION Validate the learned map and tune the effective noise level.
+function filter_par = run_validation(model)
+%RUN_VALIDATION Validate a learned map using multiple validation flights.
+%
+% Usage:
+%   filter_par = run_validation(obs,model)
+%
+% Inputs:
+%   obs
+%       Struct array of validation observations. Each element represents
+%       one flight and must contain the fields y, r_ned and q.
+%
+%   model
+%       Learned map model.
+%
+% Output:
+%   filter_par
+%       Struct array with the same size as obs. Each element contains the
+%       validation results for the corresponding flight, including its own
+%       maximum-likelihood estimate of sigma_validation.
+%
+% Each flight is processed independently. This means that flights at
+% different heights obtain separate estimates of the effective validation
+% noise standard deviation.
+
+    nFlights = numel(model.val_obs);
+    results = cell(size(model.val_obs));
+
+    for ii = 1:nFlights
+        results{ii} = run_single_validation(model.val_obs(ii),model);
+        results{ii}.flight_index =model.settings.idx_validation_data_set(ii);
+    end
+
+    % Convert the cell array of scalar structs to a struct array while
+    % preserving the shape of the input obs array.
+    filter_par = reshape([results{:}],size(model.val_obs));
+end
+
+
+function filter_par = run_single_validation(obs,model)
+%RUN_SINGLE_VALIDATION Validate one flight and tune its effective noise level.
 %
 % The validation noise standard deviation settings.noise.sigma_validation
 % is estimated by maximizing the validation-data log likelihood.
