@@ -65,7 +65,7 @@ function plot_flight_paths(data,settings,saveAsPdf)
     end
 
     geobasemap(gx1,'topographic');
-    title(gx1,'Flight paths used for map building', ...
+    title(gx1,'Flight paths used for map learning', ...
         'FontSize',fontSize,'FontWeight','normal');
 
     lgd = legend(gx1,"Flight " + string(settings.idx), ...
@@ -114,7 +114,7 @@ function plot_flight_paths(data,settings,saveAsPdf)
     ylim(ax1,[0 110]);
     ax1.FontSize = fontSize;
     box on;
-    text(550,settings.altitude_min-10,'Height threshold map building','FontSize',fontSize,'HorizontalAlignment','center','Color','k')
+    text(550,settings.altitude_min-10,'Height threshold map learning','FontSize',fontSize,'HorizontalAlignment','center','Color','k')
 
     drawnow;
 
@@ -144,7 +144,7 @@ function plot_flight_paths(data,settings,saveAsPdf)
     geobasemap(gx2,'topographic');
     geolimits(gx2,latLim,lonLim);
 
-    title(gx2,'Flight paths used for validation', ...
+    title(gx2,'Flight paths used for map validation', ...
         'FontSize',fontSize,'FontWeight','normal');
 
     lgd = legend(gx2, ...

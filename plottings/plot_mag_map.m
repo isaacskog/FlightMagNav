@@ -18,7 +18,7 @@ if nargin < 2 || isempty(saveFigures)
     saveFigures = false;
 end
 
-fontSize = 14;
+fontSize = 13;
 gridRes = 5;
 anomalyClim = [-70 70];
 uncertaintyClim = [0.5 2];
@@ -48,12 +48,6 @@ north = nMin:gridRes:nMax;
 east  = eMin:gridRes:eMax;
 [N,E] = meshgrid(north,east);
 
-inside = inpolygon( ...
-    N(:), ...
-    E(:), ...
-    rTrack(kHull,1), ...
-    rTrack(kHull,2));
-
 % Predict map mean and variance.
 r = [N(:),E(:),zeros(numel(N),1)];
 [B,sigma2] = model.predict_map(r);
@@ -63,9 +57,7 @@ sigma = sqrt(sigma2);
 
 % Only plot map values where the posterior standard deviation is below
 % the selected threshold.
-idxModel = ...
-    inside & ...
-    ~isnan(B) & ...
+idxModel =   ~isnan(B) & ...
     ~isnan(sigma) & ...
     sigma < maxMapStd;
 
@@ -98,7 +90,7 @@ format_map_axes( ...
 %% Posterior standard deviation
 
 % The uncertainty figure is shown for analysis, but is not exported.
-idxUncertainty = inside & ~isnan(sigma);
+idxUncertainty =~isnan(sigma);
 
 figUncertainty = create_map_figure();
 axUncertainty = axes(figUncertainty);
@@ -154,7 +146,7 @@ function format_map_axes( ...
 
 xlabel(ax,'East [m]');
 ylabel(ax,'North [m]');
-title(ax,plotTitle);
+title(ax,plotTitle,"FontSize",fontSize,"FontWeight","normal");
 
 axis(ax,'equal');
 xlim(ax,xLimits);
@@ -175,6 +167,7 @@ cb = colorbar(ax);
 cb.Label.String = colorbarLabel;
 cb.FontSize = fontSize;
 cb.Label.FontSize = fontSize;
+cb.FontWeight="normal";
 
 drawnow;
 end
