@@ -38,7 +38,7 @@ template = struct( ...
     'ref_mag',[], ...
     'front_mag',[], ...
     'back_mag',[], ...
-    'GPSaidedINS',[], ...
+    'GNSSaidedINS',[], ...
     'UPS_ref_mag',[]);
 
 data = repmat(template,1,nFlights);
@@ -80,7 +80,7 @@ parfor ii = 1:nFlights
     % ---------------------------------------------------------------------
     filename = fullfile(acquisitionFolder,'GPSINS.txt');
 
-    flightData.GPSaidedINS = parse_gps_aided_ins_data( ...
+    flightData.GNSSaidedINS = parse_gps_aided_ins_data( ...
         filename, ...
         flightInfo(ii).start_time, ...
         flightInfo(ii).stop_time);
@@ -94,7 +94,7 @@ parfor ii = 1:nFlights
 
         flightData.ref_mag = parse_ref_mag_data( ...
             filename, ...
-            flightData.GPSaidedINS.time);
+            flightData.GNSSaidedINS.time);
     end
 
     % ---------------------------------------------------------------------
@@ -112,7 +112,7 @@ parfor ii = 1:nFlights
 
     flightData.UPS_ref_mag = parse_ups_ref_mag_data( ...
         filename, ...
-        flightData.GPSaidedINS.time);
+        flightData.GNSSaidedINS.time);
 
     % ---------------------------------------------------------------------
     % Front magnetometer.
@@ -121,7 +121,7 @@ parfor ii = 1:nFlights
 
     flightData.front_mag = parse_front_mag_data( ...
         filename, ...
-        flightData.GPSaidedINS);
+        flightData.GNSSaidedINS);
 
     % ---------------------------------------------------------------------
     % Back magnetometer.
@@ -130,7 +130,7 @@ parfor ii = 1:nFlights
 
     flightData.back_mag = parse_front_mag_data( ...
         filename, ...
-        flightData.GPSaidedINS);
+        flightData.GNSSaidedINS);
 
     % Store parsed flight.
     data(ii) = flightData;
@@ -142,7 +142,7 @@ if ~exist(parsedRoot,'dir')
     mkdir(parsedRoot);
 end
 
-filename = fullfile(parsedRoot,'FlightData.mat');
+filename = fullfile(parsedRoot,'FlightMagNav.mat');
 
 save(filename,'data','-v7.3');
 
