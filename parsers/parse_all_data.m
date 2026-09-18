@@ -1,89 +1,197 @@
-% Main script for parsing all the data from the data collection in Skovde. 
-% All data is synchronized to the GPS aided INS and converted into a 100 Hz
+% Main script for parsing all data from the data collection in Skovde.
+% All data are synchronized to the GPS-aided INS and converted to a 100 Hz
 % sample rate.
 %
-% Note: 
-% 
-% 1) Scalar magnetometer data is low-pass filtred at 45 Hz to avoid
-% aliasing of the 50 Hz components when downsampling to 100 Hz. 
+% Notes:
 %
-% 2) Vector readings from the magnetometers are keeped at 125/3 Hz. 
+% 1) Scalar magnetometer data are low-pass filtered at 45 Hz to avoid
+% aliasing of the 50 Hz components when downsampling to 100 Hz.
 %
-% Isaac Skog and ChatGPT, 2026-06-15
+% 2) Vector readings from the magnetometers are kept at 125/3 Hz.
+%
+% Isaac Skog and ChatGPT, 2026
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% Preamble
 
-%% Preamble 
+% Dataset folders.
+datasetRoot = fullfile('..','..');
 
-% Folders
-folders={'Flygning1','Flygning2','Flygning3','Flygning4','Flygning5','Flygning6','Flygning6','Flygning7'}; % Map 6 containes data from 2 flights
+rawRoot = fullfile(datasetRoot,'raw');
+metadataFile = fullfile(datasetRoot,'metadata','flights.txt');
+parsedRoot = fullfile(datasetRoot,'parsed');
 
-% Start and stop times according to the protocols
-startandstoptimes=...
-    [datetime(2026,6,10,10,47,0,0,"TimeZone","UTC") datetime(2026,6,10,11,2,0,0,"TimeZone","UTC");... % 1
-    datetime(2026,6,10,13,5,0,0,"TimeZone","UTC") datetime(2026,6,10,13,23,0,0,"TimeZone","UTC");... % 2
-    datetime(2026,6,10,14,4,0,0,"TimeZone","UTC") datetime(2026,6,10,14,22,0,0,"TimeZone","UTC"); ... % 3
-    datetime(2026,6,11,8,5,0,0,"TimeZone","UTC") datetime(2026,6,11,8,22,0,0,"TimeZone","UTC"); ... % 4
-    datetime(2026,6,11,9,40,0,0,"TimeZone","UTC") datetime(2026,6,11,9,59,0,0,"TimeZone","UTC");... % 5
-    datetime(2026,6,11,12,15,0,0,"TimeZone","UTC") datetime(2026,6,11,12,25,0,0,"TimeZone","UTC");... % 6.1
-        datetime(2026,6,11,12,31,0,0,"TimeZone","UTC") datetime(2026,6,11,12,42,0,0,"TimeZone","UTC");... % 6.2
-                datetime(2026,6,11,12,52,0,0,"TimeZone","UTC") datetime(2026,6,11,13,03,0,0,"TimeZone","UTC");... % 7
-    ];
+% Read flight metadata.
+flightInfo = read_flight_metadata(metadataFile);
 
-% Data from references sensor okay
-ref_sensor_meas_okay=logical([0 0 1 1 1 1 0 1]);
+nFlights = numel(flightInfo);
 
 %% Parse all data
-data=repmat(struct('ref_mag',[],'front_mag',[],'back_mag',[],'GPSaidedINS',[],'UPS_ref_mag',[]),1,numel(folders));
-parfor ii=1:numel(folders)
-    
-    disp(['Data set ' num2str(ii) ' out of ' num2str(numel(folders))]);
 
-    % GPS aided INS. The time base of this system will be the time base for
-    % all other sensors
-    filename = fullfile('..','..',folders{ii},'GPSINS.txt');
-    data(ii).GPSaidedINS=parse_gps_aided_ins_data(filename,startandstoptimes(ii,1),startandstoptimes(ii,2));
- 
-    % Reference magnetometers
-    if ref_sensor_meas_okay(ii)
-        filename = fullfile('..','..',folders{ii},'RefMag.txt');
-        data(ii).ref_mag = parse_ref_mag_data(filename,data(ii).GPSaidedINS.time);
+template = struct( ...
+    'flight_id',[], ...
+    'start_time',[], ...
+    'stop_time',[], ...
+    'raw_folder','', ...
+    'purpose','', ...
+    'ref_mag',[], ...
+    'front_mag',[], ...
+    'back_mag',[], ...
+    'GPSaidedINS',[], ...
+    'UPS_ref_mag',[]);
+
+data = repmat(template,1,nFlights);
+
+parfor ii = 1:nFlights
+
+    disp(['Flight ' num2str(flightInfo(ii).flight) ...
+        ' out of ' num2str(nFlights)]);
+
+    flightData = template;
+
+    % ---------------------------------------------------------------------
+    % Flight metadata.
+    % ---------------------------------------------------------------------
+    flightData.flight_id = flightInfo(ii).flight;
+    flightData.start_time = flightInfo(ii).start_time;
+    flightData.stop_time = flightInfo(ii).stop_time;
+    flightData.raw_folder = flightInfo(ii).raw_folder;
+    flightData.purpose = flightInfo(ii).purpose;
+
+    % ---------------------------------------------------------------------
+    % Determine raw-data folder.
+    %
+    % Example:
+    %   raw/2026-06-10/acquisition_01/
+    % ---------------------------------------------------------------------
+    dateFolder = datestr(flightInfo(ii).start_time,'yyyy-mm-dd');
+
+    acquisitionFolder = fullfile( ...
+        rawRoot, ...
+        dateFolder, ...
+        flightInfo(ii).raw_folder);
+
+    % ---------------------------------------------------------------------
+    % GPS-aided INS.
+    %
+    % The time base of this system is used as the common time base for all
+    % other sensors.
+    % ---------------------------------------------------------------------
+    filename = fullfile(acquisitionFolder,'GPSINS.txt');
+
+    flightData.GPSaidedINS = parse_gps_aided_ins_data( ...
+        filename, ...
+        flightInfo(ii).start_time, ...
+        flightInfo(ii).stop_time);
+
+    % ---------------------------------------------------------------------
+    % Local reference magnetometer.
+    % ---------------------------------------------------------------------
+    if flightInfo(ii).local_ref_ok
+
+        filename = fullfile(acquisitionFolder,'RefMag.txt');
+
+        flightData.ref_mag = parse_ref_mag_data( ...
+            filename, ...
+            flightData.GPSaidedINS.time);
     end
 
-    % Uppsala reference magnetometers
-    filename = fullfile('..','..',folders{ii},'ups_ref.sec');
-    data(ii).UPS_ref_mag = parse_ups_ref_mag_data(filename,data(ii).GPSaidedINS.time);
+    % ---------------------------------------------------------------------
+    % Uppsala geomagnetic reference station.
+    %
+    % Example:
+    %   raw/reference/ups_ref_20260610.sec
+    % ---------------------------------------------------------------------
+    dateString = datestr(flightInfo(ii).start_time,'yyyymmdd');
 
-    % Front magnetometer
-    filename = fullfile('..','..',folders{ii},'FrontMag.txt');
-    data(ii).front_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS);
+    filename = fullfile( ...
+        rawRoot, ...
+        'reference', ...
+        ['ups_ref_' dateString '.sec']);
 
-    % Back magnetometer
-    filename = fullfile('..','..',folders{ii},'BackMag.txt');
-    data(ii).back_mag = parse_front_mag_data(filename,data(ii).GPSaidedINS);
-    
-    % figure(1)
-    % clf
-    % plot(data(ii).front_mag.delay_info.time, ...
-    %  data(ii).front_mag.delay_info.delay_raw,'o')
-    % hold on
-    % plot(data(ii).front_mag.delay_info.time, ...
-    %     data(ii).front_mag.delay_info.delay,'-')
-    % title('Front mag')
-    % 
-    % figure(2)
-    % clf
-    %    plot(data(ii).back_mag.delay_info.time, ...
-    %  data(ii).back_mag.delay_info.delay_raw,'o')
-    %    hold on
-    %    plot(data(ii).back_mag.delay_info.time, ...
-    %        data(ii).back_mag.delay_info.delay,'-')
-    % title('Back mag')
+    flightData.UPS_ref_mag = parse_ups_ref_mag_data( ...
+        filename, ...
+        flightData.GPSaidedINS.time);
+
+    % ---------------------------------------------------------------------
+    % Front magnetometer.
+    % ---------------------------------------------------------------------
+    filename = fullfile(acquisitionFolder,'FrontMag.txt');
+
+    flightData.front_mag = parse_front_mag_data( ...
+        filename, ...
+        flightData.GPSaidedINS);
+
+    % ---------------------------------------------------------------------
+    % Back magnetometer.
+    % ---------------------------------------------------------------------
+    filename = fullfile(acquisitionFolder,'BackMag.txt');
+
+    flightData.back_mag = parse_front_mag_data( ...
+        filename, ...
+        flightData.GPSaidedINS);
+
+    % Store parsed flight.
+    data(ii) = flightData;
 end
 
-%% Save the data
-filename = fullfile('..','..','Matlab','SkovdeFlightData');
-save(filename,"data");
+%% Save parsed data
 
+if ~exist(parsedRoot,'dir')
+    mkdir(parsedRoot);
+end
+
+filename = fullfile(parsedRoot,'FlightData.mat');
+
+save(filename,'data','-v7.3');
+
+
+%% Local functions
+
+function flightInfo = read_flight_metadata(filename)
+%READ_FLIGHT_METADATA Read metadata describing the individual flights.
+%
+% Expected format:
+%
+% flight raw_folder start_utc stop_utc local_ref_ok purpose
+
+    lines = readlines(filename);
+
+    % Remove header and empty lines.
+    lines = lines(2:end);
+    lines = lines(strlength(strtrim(lines)) > 0);
+
+    nFlights = numel(lines);
+
+    flightInfo = repmat(struct( ...
+        'flight',[], ...
+        'raw_folder','', ...
+        'start_time',[], ...
+        'stop_time',[], ...
+        'local_ref_ok',false, ...
+        'purpose',''), ...
+        1,nFlights);
+
+    for ii = 1:nFlights
+
+        parts = regexp(strtrim(lines(ii)),'\s+','split');
+
+        flightInfo(ii).flight = str2double(parts{1});
+        flightInfo(ii).raw_folder = parts{2};
+
+        flightInfo(ii).start_time = datetime( ...
+            [parts{3} ' ' parts{4}], ...
+            'InputFormat','yyyy-MM-dd HH:mm:ss', ...
+            'TimeZone','UTC');
+
+        flightInfo(ii).stop_time = datetime( ...
+            [parts{5} ' ' parts{6}], ...
+            'InputFormat','yyyy-MM-dd HH:mm:ss', ...
+            'TimeZone','UTC');
+
+        flightInfo(ii).local_ref_ok = strcmpi(parts{7},'true');
+        flightInfo(ii).purpose = parts{8};
+    end
+end
 
