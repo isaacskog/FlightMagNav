@@ -1,9 +1,17 @@
 close all; clc; 
 
-addpath(fullfile('..','..','Matlab','utils/'))
-addpath(fullfile('..','..','Matlab','plottings/'))
+% Dataset folders.
+Root = fullfile('..','..');
+rawRoot = fullfile(Root,'raw');
+metadataFile = fullfile(Root,'metadata','flights.txt');
+parsedRoot = fullfile(Root,'parsed');
+
+% Support functions
+addpath(fullfile(Root,'matlab/utils'));
+addpath(fullfile(Root,'matlab/plottings'));
+
 % Load data
-filename = fullfile('..','..','Matlab','SkovdeFlightData');
+filename = fullfile(parsedRoot,'FlightMagNav');
 load(filename);
 
 % Get settings
@@ -16,23 +24,18 @@ model = fit_mag_map_model(data,settings);
 plot_flight_paths(data,settings)
 
 
-% Plot heights
-%plot_trajectory_heights(model);
-
 % Plot filter results
 plot_filter_parameters(model.obs,model.filterInfo)
 
 % Plot estimated map, including uncertinaty 
 plot_mag_map(model,'model')
 
-% Plot map according to SGU
-%plot_mag_map(model,'sgu','sgudata.mat')
-
-
 % Plot validation results
 plot_filter_parameters(model.val_obs,model.validInfo)
 
-disp(model.validInfo.sigma_validation)
+for ii=1:numel(model.validInfo)
+disp(model.validInfo(ii).sigma_validation)
+end
 
 % % Save the results
 % timestamp = string(datetime('now','Format','yyyyMMdd_HHmmss'));

@@ -49,7 +49,7 @@ filterOrder = 3;
 [b,a] = butter(filterOrder,fc/(fsIn/2),'low');
 
 
-ins = data.GPSaidedINS;
+ins = data.GNSSaidedINS;
 
 tIn = seconds(ins.time - ins.time(1));
 tOut = (0:1/settings.fs_map:tIn(end)).';

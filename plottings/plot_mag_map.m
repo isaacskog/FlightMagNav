@@ -29,7 +29,7 @@ baseMap = 'topographic';
 pathFigureSize = [17.8 12];
 
 outputFolder = fullfile( ...
-    '..','..','Matlab','publication_figures');
+    fileparts(fileparts(mfilename('fullpath'))),'publication_figures');
 
 % Create a local evaluation grid.
 centers = model.basis.map.centers;
@@ -57,7 +57,6 @@ idxModel = ...
     sigma < maxMapStd;
 
 Bmodel = B(idxModel);
-Bmodel = Bmodel - mean(Bmodel,'omitnan');
 
 figModel = create_map_figure(pathFigureSize);
 gxModel = geoaxes(figModel);

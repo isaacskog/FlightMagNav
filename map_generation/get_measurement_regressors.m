@@ -5,8 +5,9 @@ Rb2n_enu = quat2rotm(q);                  % Note that Xsense uses ENU. Body to N
 Rb2n=[0 1 0; 1 0 0; 0 0 -1]*Rb2n_enu;
 Rn2b = Rb2n';
 
-% Create regressor for the orientation dependent bias
-z = (Rn2b*settings.B_e_ned).';
+% Equation (7): use the direction of the nominal field, not its magnitude.
+m0 = settings.B_e_ned(:);
+z = (Rn2b*(m0/norm(m0))).';
 
 % Get position of front and back sensor in NED coordinates
 r_front = r_ned + (Rb2n*settings.pos_front_mag(:)).';

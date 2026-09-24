@@ -7,7 +7,7 @@ function plot_flight_paths(data,settings,saveAsPdf)
 %
 % Inputs:
 %   data
-%       Struct array containing data(ii).GPSaidedINS.
+%       Struct array containing data(ii).GNSSaidedINS.
 %
 %   settings
 %       Structure containing
@@ -57,8 +57,8 @@ function plot_flight_paths(data,settings,saveAsPdf)
     hold(gx1,'on');
 
     for k = settings.idx
-        lat = data(k).GPSaidedINS.latitude;
-        lon = data(k).GPSaidedINS.longitude;
+        lat = data(k).GNSSaidedINS.latitude;
+        lon = data(k).GNSSaidedINS.longitude;
         valid = ~isnan(lat) & ~isnan(lon);
 
         geoplot(gx1,lat(valid),lon(valid),'LineWidth',lineWidth);
@@ -95,9 +95,9 @@ function plot_flight_paths(data,settings,saveAsPdf)
 
     for k = settings.idx
         time = seconds( ...
-            data(k).GPSaidedINS.time - data(k).GPSaidedINS.time(1));
-        height = data(k).GPSaidedINS.altitude - ...
-            data(k).GPSaidedINS.altitude(1);
+            data(k).GNSSaidedINS.time - data(k).GNSSaidedINS.time(1));
+        height = data(k).GNSSaidedINS.altitude - ...
+            data(k).GNSSaidedINS.altitude(1);
         valid = ~isnan(height);
 
         plot(ax1,time(valid),height(valid),'LineWidth',lineWidth);
@@ -134,8 +134,8 @@ function plot_flight_paths(data,settings,saveAsPdf)
     hold(gx2,'on');
 
     for k = settings.idx_validation_data_set
-        lat = data(k).GPSaidedINS.latitude;
-        lon = data(k).GPSaidedINS.longitude;
+        lat = data(k).GNSSaidedINS.latitude;
+        lon = data(k).GNSSaidedINS.longitude;
         valid = ~isnan(lat) & ~isnan(lon);
 
         geoplot(gx2,lat(valid),lon(valid),'LineWidth',lineWidth);
@@ -175,9 +175,9 @@ function plot_flight_paths(data,settings,saveAsPdf)
 
     for k = settings.idx_validation_data_set
         time = seconds( ...
-            data(k).GPSaidedINS.time - data(k).GPSaidedINS.time(1));
-        height = data(k).GPSaidedINS.altitude - ...
-            data(k).GPSaidedINS.altitude(1);
+            data(k).GNSSaidedINS.time - data(k).GNSSaidedINS.time(1));
+        height = data(k).GNSSaidedINS.altitude - ...
+            data(k).GNSSaidedINS.altitude(1);
         valid = ~isnan(height);
 
         plot(ax2,time(valid),height(valid),'LineWidth',lineWidth);
