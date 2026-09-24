@@ -7,7 +7,6 @@ settings.reference_lla=[58.2952919010000;...                                % Re
     13.9020338060000;...
     166.931992000000];
 settings.fs_map = 1;                                                        % Map and validation sampling rate [Hz].
-settings.map_cutoff_hz = 0.45;                                              % Low-pass cutoff before downsampling [Hz].
 settings.altitude_min = 50;                                                 % Min altitude [m] relative the starting altitude for the data used in the map creation     
 settings.pos_front_mag = -1e-3*[958/2+52/2-30 0 0];                         % Position of front sensor in the platform coordinate [m]
 settings.pos_back_mag = 1e-3*[958/2-52/2-30 0 0];                           % Position of back sensor in the platform coordinate [m]

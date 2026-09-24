@@ -2,8 +2,6 @@ close all; clc;
 
 % Dataset folders.
 Root = fullfile('..','..');
-rawRoot = fullfile(Root,'raw');
-metadataFile = fullfile(Root,'metadata','flights.txt');
 parsedRoot = fullfile(Root,'parsed');
 
 % Support functions
@@ -32,7 +30,3 @@ for ii = 1:numel(model.validInfo)
     fprintf('Flight %d: validation noise %.3f nT\n', ...
         model.validInfo(ii).flight_index,model.validInfo(ii).sigma_validation);
 end
-
-% % Save the results
-% timestamp = string(datetime('now','Format','yyyyMMdd_HHmmss'));
-% save("GeneratedModel_" + timestamp + ".mat", "model");
