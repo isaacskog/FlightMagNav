@@ -11,7 +11,8 @@ settings.map_cutoff_hz = 0.45;                                              % Lo
 settings.altitude_min = 50;                                                 % Min altitude [m] relative the starting altitude for the data used in the map creation     
 settings.pos_front_mag = -1e-3*[958/2+52/2-30 0 0];                         % Position of front sensor in the platform coordinate [m]
 settings.pos_back_mag = 1e-3*[958/2-52/2-30 0 0];                           % Position of back sensor in the platform coordinate [m]
-settings.B_e_ned = wrldmagm( ...                                            % Fixed part of the magnetic field
+% Nominal Earth-field vector in NED [nT].
+settings.m0 = wrldmagm( ...
     settings.reference_lla(3)/1000, ...
     settings.reference_lla(1), ...
     settings.reference_lla(2), ...
@@ -21,9 +22,9 @@ settings.map.center_spacing = 50;                                           % Sp
 settings.map.margin = settings.map.center_spacing;                          % How much should the grid of basis function extend beyond the area covered by the flight paths
 settings.map.sigma = 25;                                                    % Prior on the basis function weights [nT]
 settings.map.length_scale =-2*pi*50/log(0.01);                              % Length scale used in the basis functions [m]
-settings.time.sigma_g0 = 22.5;                                              % Prior uncertainty (std) on the temporal variation bias [nT]. This also captures total changes in the field level between the flights. 
 settings.noise.sigma = [0.74;0.88;0.83;1.41]';                              % Measurement noise/model error standard deviation [nT] for the different flights 
-settings.calibration.sigma_ori = 1.34e-4*norm(settings.B_e_ned);
+% Initial prior standard deviation for the eight calibration coefficients [nT].
+settings.calibration.sigma_xi = 1.34e-4*norm(settings.m0);
 settings.noise.sigma_validation=3;
 
 end

@@ -158,7 +158,7 @@ function [filter_par,logLikelihood] = run_validation_filter( ...
 %
 % The original stacked measurement model is
 %
-%   y - Hmap*thetaMap = Hcal*x + e,
+%   y - Hmap*thetaMap = Hcal*xi + e,
 %
 % where
 %
@@ -166,7 +166,7 @@ function [filter_par,logLikelihood] = run_validation_filter( ...
 %
 % If Sigma = L*L', prewhitening gives
 %
-%   L\(y - Hmap*thetaMap) = (L\Hcal)*x + w,
+%   L\(y - Hmap*thetaMap) = (L\Hcal)*xi + w,
 %
 % with w ~ N(0,I). Both the measurements and Hcal must therefore be
 % transformed by L.
@@ -195,10 +195,8 @@ function [filter_par,logLikelihood] = run_validation_filter( ...
     % ---------------------------------------------------------------------
     % Initialize the validation states.
     % ---------------------------------------------------------------------
-    [x,P] = get_initial_states(paramInfo,settings);
+    [xi,P] = get_xi_prior(paramInfo,settings);
 
-    ssm.F = eye(paramInfo.nstate);
-    ssm.Q = zeros(paramInfo.nstate);
     ssm.R = eye(2);
 
     logLikelihoodWhitened = 0;
@@ -208,14 +206,10 @@ function [filter_par,logLikelihood] = run_validation_filter( ...
 
         filter_par.NIS = zeros(N,1);
         filter_par.normalizedInnovation=zeros(N,2);
-        filter_par.g = zeros(N,1);
-        filter_par.g_var = zeros(N,1);
-
-        filter_par.ori_bias_front = zeros(N,3);
-        filter_par.ori_bias_front_cov_diag = zeros(N,3);
-
-        filter_par.ori_bias_back = zeros(N,3);
-        filter_par.ori_bias_back_cov_diag = zeros(N,3);
+        filter_par.xi_front = zeros(N,4);
+        filter_par.xi_front_cov_diag = zeros(N,4);
+        filter_par.xi_back = zeros(N,4);
+        filter_par.xi_back_cov_diag = zeros(N,4);
     else
         filter_par = [];
     end
@@ -232,7 +226,7 @@ function [filter_par,logLikelihood] = run_validation_filter( ...
         % Cholesky factor as the measurements.
         ssm.H = [HcalTilde(nn,:); HcalTilde(nn+N,:)];
 
-        [x,P,logL,NIS,normalizedInnovation] = step_kf(y,x,P,ssm);
+        [xi,P,logL,NIS,normalizedInnovation] = step_kf(y,xi,P,ssm);
 
         logLikelihoodWhitened = logLikelihoodWhitened + logL;
 
@@ -240,25 +234,12 @@ function [filter_par,logLikelihood] = run_validation_filter( ...
             filter_par.NIS(nn) = NIS;
             filter_par.normalizedInnovation(nn,:) = normalizedInnovation';
 
-            filter_par.g(nn) = x(paramInfo.idx_g);
-            filter_par.g_var(nn) = ...
-                P(paramInfo.idx_g,paramInfo.idx_g);
-
-            filter_par.ori_bias_front(nn,:) = ...
-                x(paramInfo.idx_ori_front).';
-
-            filter_par.ori_bias_front_cov_diag(nn,:) = ...
-                diag(P( ...
-                paramInfo.idx_ori_front, ...
-                paramInfo.idx_ori_front)).';
-
-            filter_par.ori_bias_back(nn,:) = ...
-                x(paramInfo.idx_ori_back).';
-
-            filter_par.ori_bias_back_cov_diag(nn,:) = ...
-                diag(P( ...
-                paramInfo.idx_ori_back, ...
-                paramInfo.idx_ori_back)).';
+            idx_front = paramInfo.idx_xi_front;
+            idx_back = paramInfo.idx_xi_back;
+            filter_par.xi_front(nn,:) = xi(idx_front).';
+            filter_par.xi_front_cov_diag(nn,:) = diag(P(idx_front,idx_front)).';
+            filter_par.xi_back(nn,:) = xi(idx_back).';
+            filter_par.xi_back_cov_diag(nn,:) = diag(P(idx_back,idx_back)).';
         end
     end
 
@@ -271,35 +252,21 @@ end
 function paramInfo = build_parameter_info_validation()
 %BUILD_PARAMETER_INFO_VALIDATION Define validation-state layout.
 %
-% State:
-%   x = [
-%       theta_ori_front
-%       theta_ori_back
-%       g
-%   ]
+% State: xi = [orientation_front(3); bias_front;
+%              orientation_back(3); bias_back].
 
     paramInfo = struct();
-    paramInfo.idx_ori_front = 1:3;
-    paramInfo.idx_ori_back = 4:6;
-    paramInfo.idx_g = 7;
-    paramInfo.nstate = 7;
+    paramInfo.idx_xi_front = 1:4;
+    paramInfo.idx_xi_back = 5:8;
+    paramInfo.nstate = 8;
 end
 
 
-function [x,P] = get_initial_states(paramInfo,settings)
-%GET_INITIAL_STATES Construct validation-state prior.
+function [xi,P] = get_xi_prior(paramInfo,settings)
+%GET_XI_PRIOR Construct the independent validation calibration prior.
 
-    x = zeros(paramInfo.nstate,1);
-    P = zeros(paramInfo.nstate,paramInfo.nstate);
-
-    P(paramInfo.idx_ori_front,paramInfo.idx_ori_front) = ...
-        settings.calibration.sigma_ori^2*eye(3);
-
-    P(paramInfo.idx_ori_back,paramInfo.idx_ori_back) = ...
-        settings.calibration.sigma_ori^2*eye(3);
-
-    P(paramInfo.idx_g,paramInfo.idx_g) = ...
-        settings.time.sigma_g0^2;
+    xi = zeros(paramInfo.nstate,1);
+    P = settings.calibration.sigma_xi^2*eye(paramInfo.nstate);
 end
 
 
@@ -325,10 +292,7 @@ function [Hmap,Hcal] = get_mesaurement_matrix_validation( ...
         Hmap(nn,:) = PhiFront;
         Hmap(N+nn,:) = PhiBack;
 
-        Hcal(nn,paramInfo.idx_ori_front) = z;
-        Hcal(nn,paramInfo.idx_g) = 1;
-
-        Hcal(N+nn,paramInfo.idx_ori_back) = z;
-        Hcal(N+nn,paramInfo.idx_g) = 1;
+        Hcal(nn,paramInfo.idx_xi_front) = [z 1];
+        Hcal(N+nn,paramInfo.idx_xi_back) = [z 1];
     end
 end

@@ -2,8 +2,8 @@ function [obs,val_obs] = build_observation_data(data,settings)
 %BUILD_OBSERVATION_DATA Build low-rate front/back magnetometer observations.
 %
 % obs(ii) contains one flight. obs(ii).y has two columns:
-%   column 1: front magnetometer total field
-%   column 2: back magnetometer total field
+%   column 1: front anomaly relative to the nominal field
+%   column 2: back anomaly relative to the nominal field
 
 obs = repmat(struct( ...
     'time',[], ...
@@ -100,7 +100,7 @@ end
 % Store the data
 obs.time = ins.time(1) + seconds(tOut(idx));
 obs.t_sec = tOut(idx);
-obs.y = [yFront(idx) yBack(idx)]-mean([yFront(idx); yBack(idx)]);
+obs.y = [yFront(idx) yBack(idx)] - norm(settings.m0);
 obs.r_ned = rBody(idx,:);
 obs.q = q(idx,:);
 obs.lla=lla(idx,:);

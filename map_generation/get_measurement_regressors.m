@@ -6,7 +6,7 @@ Rb2n=[0 1 0; 1 0 0; 0 0 -1]*Rb2n_enu;
 Rn2b = Rb2n';
 
 % Equation (7): use the direction of the nominal field, not its magnitude.
-m0 = settings.B_e_ned(:);
+m0 = settings.m0(:);
 z = (Rn2b*(m0/norm(m0))).';
 
 % Get position of front and back sensor in NED coordinates

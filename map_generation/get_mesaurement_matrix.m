@@ -12,9 +12,7 @@ function H = get_mesaurement_matrix(r_ned,q,flightNumber,basis,paramInfo,setting
 % Build the matrix
 H = zeros(2,paramInfo.n_state);
 H(1,paramInfo.idx_map) = Phi_front;
-H(1,paramInfo.flight(flightNumber).idx_ori_front) = z;
-H(1,paramInfo.flight(flightNumber).idx_g) = 1;
+H(1,paramInfo.flight(flightNumber).idx_xi_front) = [z 1];
 H(2,paramInfo.idx_map) = Phi_back;
-H(2,paramInfo.flight(flightNumber).idx_ori_back) = z;
-H(2,paramInfo.flight(flightNumber).idx_g) = 1;
+H(2,paramInfo.flight(flightNumber).idx_xi_back) = [z 1];
 end

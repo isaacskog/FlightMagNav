@@ -27,7 +27,7 @@ plot_flight_paths(data,settings)
 % Plot filter results
 plot_filter_parameters(model.obs,model.filterInfo)
 
-% Plot estimated map, including uncertinaty 
+% Plot estimated map
 plot_mag_map(model,'model')
 
 % Plot validation results

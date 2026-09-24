@@ -6,10 +6,9 @@ function plot_filter_parameters(obs,filter_par)
 %
 % The function plots
 %   1) empirical NIS CDF together with chi-square CDF with 2 DOF,
-%   2) temporal bias g with +/- 2 standard deviations,
-%   3) sensor bias with +/- 2 standard deviations,
-%   4) front orientation bias components with +/- 2 standard deviations,
-%   5) back orientation bias components with +/- 2 standard deviations.
+%   2) constant front and back sensor biases with +/- 2 standard deviations,
+%   3) front orientation coefficients with +/- 2 standard deviations,
+%   4) back orientation coefficients with +/- 2 standard deviations.
 
 
 
@@ -45,21 +44,28 @@ for ii = 1:nFlight
     title(sprintf('Flight %d: Mean NIS = %.2f',ii,mean(nis)))
 end
 
-    % Temporal bias g.
-    figure();    
+    % The fourth coefficient of each xi block is the constant sensor bias.
+    figure();
     clf
     for ii = 1:nFlight
-        subplot(nFlight,1,ii)
-        t = obs(ii).t_sec(:);
-        mu = filter_par(ii).g(:);
-        sig = sqrt(max(filter_par(ii).g_var(:),0));
-
-        plot_state_with_2sigma(t,mu,sig)
-        grid minor
-        xlabel('Time [s]')
-        ylabel('g')
-        title(sprintf('Flight %d: Temporal bias',ii))
-        xlim([t(2) t(end)])
+        for jj = 1:2
+            subplot(nFlight,2,2*(ii-1)+jj)
+            t = obs(ii).t_sec(:);
+            if jj == 1
+                mu = filter_par(ii).xi_front(:,4);
+                variance = filter_par(ii).xi_front_cov_diag(:,4);
+                sensor = 'Front';
+            else
+                mu = filter_par(ii).xi_back(:,4);
+                variance = filter_par(ii).xi_back_cov_diag(:,4);
+                sensor = 'Back';
+            end
+            plot_state_with_2sigma(t,mu,sqrt(max(variance,0)))
+            grid minor
+            xlabel('Time [s]')
+            ylabel('Bias [nT]')
+            title(sprintf('Flight %d: %s sensor bias',ii,sensor))
+        end
     end
 
     % Front orientation bias.
@@ -69,15 +75,14 @@ end
         for jj = 1:nOri
             subplot(nFlight,nOri,(ii-1)*nOri + jj)
             t = obs(ii).t_sec(:);
-            mu = filter_par(ii).ori_bias_front(:,jj);
-            sig = sqrt(max(filter_par(ii).ori_bias_front_cov_diag(:,jj),0));
+            mu = filter_par(ii).xi_front(:,jj);
+            sig = sqrt(max(filter_par(ii).xi_front_cov_diag(:,jj),0));
 
             plot_state_with_2sigma(t,mu,sig)
             grid minor
             xlabel('Time [s]')
-            ylabel(sprintf('ori front %d',jj))
-            title(sprintf('Flight %d: Front ori bias %d',ii,jj))
-            ylim([-3e-4 3e-4])
+            ylabel(sprintf('Front xi %d [nT]',jj))
+            title(sprintf('Flight %d: Front orientation %d',ii,jj))
         end
     end
 
@@ -88,15 +93,14 @@ end
         for jj = 1:nOri
             subplot(nFlight,nOri,(ii-1)*nOri + jj)
             t = obs(ii).t_sec(:);
-            mu = filter_par(ii).ori_bias_back(:,jj);
-            sig = sqrt(max(filter_par(ii).ori_bias_back_cov_diag(:,jj),0));
+            mu = filter_par(ii).xi_back(:,jj);
+            sig = sqrt(max(filter_par(ii).xi_back_cov_diag(:,jj),0));
 
             plot_state_with_2sigma(t,mu,sig)
             grid minor
             xlabel('Time [s]')
-            ylabel(sprintf('ori back %d',jj))
-            title(sprintf('Flight %d: Back ori bias %d',ii,jj))
-            ylim([-3e-4 3e-4])
+            ylabel(sprintf('Back xi %d [nT]',jj))
+            title(sprintf('Flight %d: Back orientation %d',ii,jj))
         end
     end
 end
