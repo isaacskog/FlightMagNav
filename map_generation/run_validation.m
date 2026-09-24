@@ -1,298 +1,100 @@
-function filter_par = run_validation(model)
-%RUN_VALIDATION Validate a learned map using multiple validation flights.
+function validInfo = run_validation(model)
+%RUN_VALIDATION Estimate effective noise on independent flights using (22).
 %
-% Usage:
-%   filter_par = run_validation(obs,model)
-%
-% Inputs:
-%   obs
-%       Struct array of validation observations. Each element represents
-%       one flight and must contain the fields y, r_ned and q.
-%
-%   model
-%       Learned map model.
-%
-% Output:
-%   filter_par
-%       Struct array with the same size as obs. Each element contains the
-%       validation results for the corresponding flight, including its own
-%       maximum-likelihood estimate of sigma_validation.
-%
-% Each flight is processed independently. This means that flights at
-% different heights obtain separate estimates of the effective validation
-% noise standard deviation.
+% Each flight is evaluated separately, conditional on the learned map.
+% The map weights and the new flight's calibration xi are marginalized
+% when estimating its effective measurement-noise standard deviation.
 
-    nFlights = numel(model.val_obs);
-    results = cell(size(model.val_obs));
+obs = model.val_obs;
+validInfo = repmat(struct( ...
+    'flight_index',[], ...
+    'sigma_validation',[], ...
+    'log_likelihood',[], ...
+    'xi_front',[], ...
+    'xi_back',[], ...
+    'xi_cov',[], ...
+    'optimization',[]),size(obs));
 
-    for ii = 1:nFlights
-        results{ii} = run_single_validation(model.val_obs(ii),model);
-        results{ii}.flight_index =model.settings.idx_validation_data_set(ii);
-    end
+idxMap = model.paramInfo.idx_map;
+muMap = model.theta(idxMap);
+Pmap = model.P(idxMap,idxMap);
+Lmap = chol((Pmap + Pmap.')/2,'lower');
+sigmaXi = model.settings.calibration.sigma_xi;
+L0 = blkdiag(Lmap,sigmaXi*eye(8));
+mu0 = [muMap;zeros(8,1)];
 
-    % Convert the cell array of scalar structs to a struct array while
-    % preserving the shape of the input obs array.
-    filter_par = reshape([results{:}],size(model.val_obs));
+options = optimset( ...
+    'Display','off', ...
+    'TolX',1e-4, ...
+    'TolFun',1e-3, ...
+    'MaxIter',60, ...
+    'MaxFunEvals',120);
+
+for ii = 1:numel(obs)
+    [H,y] = build_validation_data(obs(ii),model.basis,model.settings);
+    F = H*L0;
+    residual = y - H*mu0;
+    gram = F.'*F;
+    rhs = F.'*residual;
+    residualNorm2 = residual.'*residual;
+    objective = @(logSigma) validation_evidence( ...
+        logSigma,gram,rhs,residualNorm2,numel(y));
+
+    [logSigma,~,exitflag,output] = fminsearch( ...
+        objective,log(model.settings.noise.sigma_validation),options);
+    sigma = exp(logSigma);
+    [negativeLogEvidence,muU,U] = validation_evidence( ...
+        logSigma,gram,rhs,residualNorm2,numel(y));
+    mu = mu0 + L0*muU;
+    C = L0/U;
+    P = C*C.';
+
+    idxXi = numel(idxMap)+(1:8);
+    validInfo(ii).flight_index = model.settings.idx_validation_data_set(ii);
+    validInfo(ii).sigma_validation = sigma;
+    validInfo(ii).log_likelihood = -negativeLogEvidence;
+    validInfo(ii).xi_front = mu(idxXi(1:4));
+    validInfo(ii).xi_back = mu(idxXi(5:8));
+    validInfo(ii).xi_cov = P(idxXi,idxXi);
+    validInfo(ii).optimization.exitflag = exitflag;
+    validInfo(ii).optimization.output = output;
+end
 end
 
 
-function filter_par = run_single_validation(obs,model)
-%RUN_SINGLE_VALIDATION Validate one flight and tune its effective noise level.
-%
-% The validation noise standard deviation settings.noise.sigma_validation
-% is estimated by maximizing the validation-data log likelihood.
-%
-% The optimization is performed over log(sigma_validation), which ensures
-% that the estimated standard deviation remains positive.
-%
-% Output:
-%   filter_par
-%       Kalman-filter results and validation diagnostics. In addition to
-%       the state estimates and NIS values, the structure contains
-%
-%       filter_par.sigma_validation
-%           Maximum-likelihood estimate of the effective validation-noise
-%           standard deviation [nT].
-%
-%       filter_par.log_likelihood
-%           Maximized validation-data log likelihood.
-%
-%       filter_par.optimization
-%           Information returned by fminsearch.
+function [negativeLogEvidence,muU,U] = validation_evidence( ...
+    logSigma,gram,rhs,residualNorm2,n)
+%VALIDATION_EVIDENCE Apply (23) through a parameter-space Cholesky factor.
 
-    % ---------------------------------------------------------------------
-    % Optimization settings.
-    % ---------------------------------------------------------------------
-    optimOptions = optimset( ...
-        'Display','on', ...
-        'TolX',1e-4, ...
-        'TolFun',1e-3, ...
-        'MaxIter',60, ...
-        'MaxFunEvals',120);
+sigma2 = exp(2*logSigma);
+p = size(gram,1);
+precision = eye(p) + gram/sigma2;
+precision = (precision + precision.')/2;
+U = chol(precision,'upper');
+h = rhs/sigma2;
+muU = U\(U.'\h);
 
-    % ---------------------------------------------------------------------
-    % Extract important variables.
-    % ---------------------------------------------------------------------
-    theta = model.theta;
-    Pmodel = model.P;
-    basis = model.basis;
-    settings = model.settings;
-
-    paramInfo = build_parameter_info_validation();
-
-    % Number of two-sensor observations.
-    N = size(obs.y,1);
-
-    % Stack the front measurements followed by the back measurements.
-    yStacked = obs.y(:);
-
-    % Build the map and calibration regression matrices.
-    [Hmap,Hcal] = get_mesaurement_matrix_validation( ...
-        obs.r_ned,obs.q,basis,paramInfo,settings);
-
-    % ---------------------------------------------------------------------
-    % Quantities that do not depend on sigma_validation.
-    % ---------------------------------------------------------------------
-    thetaMap = theta(model.paramInfo.idx_map);
-    Pmap = Pmodel( ...
-        model.paramInfo.idx_map,model.paramInfo.idx_map);
-
-    mapResidual = yStacked - Hmap*thetaMap;
-    mapCovariance = Hmap*Pmap*Hmap.';
-
-    % ---------------------------------------------------------------------
-    % Tune sigma_validation by maximizing the log likelihood.
-    %
-    % fminsearch performs minimization, so the objective is the negative
-    % log likelihood. Optimizing log(sigma) guarantees sigma > 0.
-    % ---------------------------------------------------------------------
-    logSigma0 = log(settings.noise.sigma_validation);
-
-    objective = @(logSigma) negative_validation_log_likelihood( ...
-        logSigma,mapResidual,mapCovariance,Hcal, ...
-        paramInfo,settings,N);
-
-    [logSigmaOpt,negativeLogLikelihood,exitflag,output] = ...
-        fminsearch(objective,logSigma0,optimOptions);
-
-    sigmaValidation = exp(logSigmaOpt);
-    settings.noise.sigma_validation = sigmaValidation;
-
-    % ---------------------------------------------------------------------
-    % Run the validation filter once more using the optimized noise level
-    % and store the complete filter output.
-    % ---------------------------------------------------------------------
-    [filter_par,logLikelihood] = run_validation_filter( ...
-        sigmaValidation,mapResidual,mapCovariance,Hcal, ...
-        paramInfo,settings,N,true);
-
-    filter_par.sigma_validation = sigmaValidation;
-    filter_par.log_likelihood = logLikelihood;
-
-    filter_par.optimization = struct();
-    filter_par.optimization.exitflag = exitflag;
-    filter_par.optimization.output = output;
-    filter_par.optimization.negative_log_likelihood = ...
-        negativeLogLikelihood;
+logDetPyy = n*log(sigma2) + 2*sum(log(diag(U)));
+quadratic = residualNorm2/sigma2 - h.'*muU;
+negativeLogEvidence = 0.5*(n*log(2*pi) + logDetPyy + quadratic);
 end
 
 
-function negativeLogLikelihood = negative_validation_log_likelihood( ...
-    logSigma,mapResidual,mapCovariance,Hcal,paramInfo,settings,N)
-%NEGATIVE_VALIDATION_LOG_LIKELIHOOD Objective used by fminsearch.
+function [H,y] = build_validation_data(obs,basis,settings)
+%BUILD_VALIDATION_DATA Construct [A B] and stack [front; back] observations.
 
-    sigmaValidation = exp(logSigma);
+n = size(obs.y,1);
+nMap = size(basis.map.centers,1);
+H = zeros(2*n,nMap+8);
+y = obs.y(:);
 
-    [~,logLikelihood] = run_validation_filter( ...
-        sigmaValidation,mapResidual,mapCovariance,Hcal, ...
-        paramInfo,settings,N,false);
+for kk = 1:n
+    [phiFront,phiBack,z] = get_measurement_regressors( ...
+        obs.r_ned(kk,:),obs.q(kk,:),basis,settings);
 
-    negativeLogLikelihood = -logLikelihood;
+    H(kk,1:nMap) = phiFront;
+    H(n+kk,1:nMap) = phiBack;
+    H(kk,nMap+(1:4)) = [z 1];
+    H(n+kk,nMap+(5:8)) = [z 1];
 end
-
-
-function [filter_par,logLikelihood] = run_validation_filter( ...
-    sigmaValidation,mapResidual,mapCovariance,Hcal, ...
-    paramInfo,settings,N,storeOutput)
-%RUN_VALIDATION_FILTER Run the prewhitened validation Kalman filter.
-%
-% The original stacked measurement model is
-%
-%   y - Hmap*thetaMap = Hcal*xi + e,
-%
-% where
-%
-%   cov(e) = sigmaValidation^2*I + Hmap*Pmap*Hmap'.
-%
-% If Sigma = L*L', prewhitening gives
-%
-%   L\(y - Hmap*thetaMap) = (L\Hcal)*xi + w,
-%
-% with w ~ N(0,I). Both the measurements and Hcal must therefore be
-% transformed by L.
-
-    % ---------------------------------------------------------------------
-    % Prewhiten the validation measurements and calibration regressors.
-    % ---------------------------------------------------------------------
-    Sigma = sigmaValidation^2*eye(2*N) + mapCovariance;
-
-    [L,cholFlag] = chol(Sigma,'lower');
-
-    if cholFlag ~= 0
-        logLikelihood = -Inf;
-        filter_par = [];
-        return;
-    end
-
-    yTilde = L\mapResidual;
-    HcalTilde = L\Hcal;
-
-    % The Kalman filter below evaluates the likelihood in the whitened
-    % domain. Subtracting log(det(L)) converts it back to the likelihood of
-    % the original measurements.
-    logJacobian = sum(log(diag(L)));
-
-    % ---------------------------------------------------------------------
-    % Initialize the validation states.
-    % ---------------------------------------------------------------------
-    [xi,P] = get_xi_prior(paramInfo,settings);
-
-    ssm.R = eye(2);
-
-    logLikelihoodWhitened = 0;
-
-    if storeOutput
-        filter_par = struct();
-
-        filter_par.NIS = zeros(N,1);
-        filter_par.normalizedInnovation=zeros(N,2);
-        filter_par.xi_front = zeros(N,4);
-        filter_par.xi_front_cov_diag = zeros(N,4);
-        filter_par.xi_back = zeros(N,4);
-        filter_par.xi_back_cov_diag = zeros(N,4);
-    else
-        filter_par = [];
-    end
-
-    % ---------------------------------------------------------------------
-    % Run the Kalman filter.
-    % ---------------------------------------------------------------------
-    for nn = 1:N
-
-        % Front and back measurements at the current sample.
-        y = [yTilde(nn); yTilde(nn+N)];
-
-        % The calibration matrix must be prewhitened using the same
-        % Cholesky factor as the measurements.
-        ssm.H = [HcalTilde(nn,:); HcalTilde(nn+N,:)];
-
-        [xi,P,logL,NIS,normalizedInnovation] = step_kf(y,xi,P,ssm);
-
-        logLikelihoodWhitened = logLikelihoodWhitened + logL;
-
-        if storeOutput
-            filter_par.NIS(nn) = NIS;
-            filter_par.normalizedInnovation(nn,:) = normalizedInnovation';
-
-            idx_front = paramInfo.idx_xi_front;
-            idx_back = paramInfo.idx_xi_back;
-            filter_par.xi_front(nn,:) = xi(idx_front).';
-            filter_par.xi_front_cov_diag(nn,:) = diag(P(idx_front,idx_front)).';
-            filter_par.xi_back(nn,:) = xi(idx_back).';
-            filter_par.xi_back_cov_diag(nn,:) = diag(P(idx_back,idx_back)).';
-        end
-    end
-
-    % Convert the likelihood from the whitened measurements back to the
-    % original measurement domain.
-    logLikelihood = logLikelihoodWhitened - logJacobian;
-end
-
-
-function paramInfo = build_parameter_info_validation()
-%BUILD_PARAMETER_INFO_VALIDATION Define validation-state layout.
-%
-% State: xi = [orientation_front(3); bias_front;
-%              orientation_back(3); bias_back].
-
-    paramInfo = struct();
-    paramInfo.idx_xi_front = 1:4;
-    paramInfo.idx_xi_back = 5:8;
-    paramInfo.nstate = 8;
-end
-
-
-function [xi,P] = get_xi_prior(paramInfo,settings)
-%GET_XI_PRIOR Construct the independent validation calibration prior.
-
-    xi = zeros(paramInfo.nstate,1);
-    P = settings.calibration.sigma_xi^2*eye(paramInfo.nstate);
-end
-
-
-function [Hmap,Hcal] = get_mesaurement_matrix_validation( ...
-    r_ned,q,basis,paramInfo,settings)
-%GET_MESAUREMENT_MATRIX_VALIDATION Build validation regression matrices.
-%
-% Measurements are stacked as
-%
-%   y_stacked = [y_front; y_back].
-
-    N = size(r_ned,1);
-    M = size(basis.map.centers,1);
-
-    Hmap = zeros(2*N,M);
-    Hcal = zeros(2*N,paramInfo.nstate);
-
-    for nn = 1:N
-
-        [PhiFront,PhiBack,z] = get_measurement_regressors( ...
-            r_ned(nn,:),q(nn,:),basis,settings);
-
-        Hmap(nn,:) = PhiFront;
-        Hmap(N+nn,:) = PhiBack;
-
-        Hcal(nn,paramInfo.idx_xi_front) = [z 1];
-        Hcal(N+nn,paramInfo.idx_xi_back) = [z 1];
-    end
 end

@@ -1,6 +1,6 @@
 function settings = get_settings()
 
-settings.tune_hyper_par=false;                                              % Turn on optimization of hyperparameters (in this case the measurement noise variance)
+settings.tune_hyper_par=true;                                              % Estimate noise and prior scales by model evidence/marginal likelihood.
 settings.idx=2:5;                                                           % Flights to use for the map creation. Flights 1-5 follow a lawnmower pattern 
 settings.idx_validation_data_set=6:8;                                       % Data set used for validation of the quality of the learned map   
 settings.reference_lla=[58.2952919010000;...                                % Reference location (lat,lon, altitude)
@@ -20,11 +20,11 @@ settings.m0 = wrldmagm( ...
     fullfile(fileparts(mfilename('fullpath')),'WMM.COF'));
 settings.map.center_spacing = 50;                                           % Spacing between the basis functions of the map [m]
 settings.map.margin = settings.map.center_spacing;                          % How much should the grid of basis function extend beyond the area covered by the flight paths
-settings.map.sigma = 25;                                                    % Prior on the basis function weights [nT]
-settings.map.length_scale =-2*pi*50/log(0.01);                              % Length scale used in the basis functions [m]
-settings.noise.sigma = [0.74;0.88;0.83;1.41]';                              % Measurement noise/model error standard deviation [nT] for the different flights 
+settings.map.sigma = 50;                                                    % Prior on the basis function weights [nT]
+settings.map.length_scale =60;                              % Length scale used in the basis functions [m]
+settings.noise.sigma = [0.6 0.8 0.8 1.3]';                              % Measurement noise/model error standard deviation [nT] for the different flights 
 % Initial prior standard deviation for the eight calibration coefficients [nT].
-settings.calibration.sigma_xi = 1.34e-4*norm(settings.m0);
+settings.calibration.sigma_xi = 10;
 settings.noise.sigma_validation=3;
 
 end

@@ -23,7 +23,7 @@ gridRes = 5;
 markerSize = 10;
 mapAlpha = 0.85;
 anomalyClim = [-70 70];
-maxMapStd =5; % Maximum posterior standard deviation shown in map [nT]
+maxMapStd =3.5; % Maximum posterior standard deviation shown in map [nT]
 baseMap = 'topographic';
 pathFigureSize = [17.8 12];
 
