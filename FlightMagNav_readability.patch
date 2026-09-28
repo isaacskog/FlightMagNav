@@ -1,0 +1,219 @@
+diff --git a/map_generation/linear_gaussian_batch.m b/map_generation/linear_gaussian_batch.m
+index 3c1a187..c992837 100644
+--- a/map_generation/linear_gaussian_batch.m
++++ b/map_generation/linear_gaussian_batch.m
+@@ -16,9 +16,9 @@ if size(H,1) ~= numel(y) || size(H,2) ~= p || ~isequal(size(L0),[p p])
+ end
+ 
+ F = H*L0;
+-residual = y - H*mu0;
+-[negativeLogEvidence,muU,U] = linear_gaussian_batch_factors( ...
+-    F,residual,noiseStd);
++meanY = H*mu0;
++[logDensity,muU,U] = log_gaussian_marginal(y,meanY,F,noiseStd);
++negativeLogEvidence = -logDensity;
+ 
+ if nargout > 1
+     mu = mu0 + L0*muU;
+diff --git a/map_generation/linear_gaussian_batch_factors.m b/map_generation/linear_gaussian_batch_factors.m
+deleted file mode 100644
+index 1908e20..0000000
+--- a/map_generation/linear_gaussian_batch_factors.m
++++ /dev/null
+@@ -1,24 +0,0 @@
+-function [negativeLogEvidence,muU,U] = linear_gaussian_batch_factors( ...
+-    F,residual,noiseStd)
+-%LINEAR_GAUSSIAN_BATCH_FACTORS Evidence with theta = mu0 + L0*u.
+-%
+-% The supplied F = H*L0 and residual = y - H*mu0 can be reused when only
+-% the measurement-noise standard deviation changes.
+-
+-residual = residual(:);
+-noiseStd = noiseStd(:);
+-n = numel(residual);
+-if isscalar(noiseStd)
+-    noiseStd = repmat(noiseStd,n,1);
+-end
+-if size(F,1) ~= n || numel(noiseStd) ~= n || ...
+-        any(~isfinite(noiseStd)) || any(noiseStd <= 0)
+-    error('Incompatible dimensions or nonpositive measurement noise.');
+-end
+-
+-G = F./noiseStd;
+-r = residual./noiseStd;
+-[logDensity,muU,U] = log_gaussian_marginal( ...
+-    G.'*G,G.'*r,r.'*r,2*sum(log(noiseStd)),n);
+-negativeLogEvidence = -logDensity;
+-end
+diff --git a/map_generation/run_validation.m b/map_generation/run_validation.m
+index cb8cfd5..8c43fde 100644
+--- a/map_generation/run_validation.m
++++ b/map_generation/run_validation.m
+@@ -1,9 +1,8 @@
+ function validInfo = run_validation(model)
+ %RUN_VALIDATION Estimate effective noise on independent flights using (14).
+ %
+-% Each flight is evaluated separately, conditional on the learned map.
+-% The map weights and the new flight's calibration xi are marginalized
+-% when estimating its effective measurement-noise standard deviation.
++% The predictive mean and covariance follow (15b)-(15c). Each flight is
++% evaluated separately, conditional on the posterior map from learning.
+ 
+ obs = model.val_obs;
+ validInfo = repmat(struct( ...
+@@ -20,8 +19,6 @@ muMap = model.theta(idxMap);
+ Pmap = model.P(idxMap,idxMap);
+ Lmap = chol((Pmap + Pmap.')/2,'lower');
+ sigmaXi = model.settings.calibration.sigma_xi;
+-L0 = blkdiag(Lmap,sigmaXi*eye(8));
+-mu0 = [muMap;zeros(8,1)];
+ 
+ options = optimset( ...
+     'Display','off', ...
+@@ -31,64 +28,60 @@ options = optimset( ...
+     'MaxFunEvals',120);
+ 
+ for ii = 1:numel(obs)
+-    [H,y] = build_validation_data(obs(ii),model.basis,model.settings);
+-    F = H*L0;
+-    residual = y - H*mu0;
+-    gram = F.'*F;
+-    rhs = F.'*residual;
+-    residualNorm2 = residual.'*residual;
+-    objective = @(logSigma) validation_evidence( ...
+-        logSigma,gram,rhs,residualNorm2,numel(y));
++    [A,B,y] = build_validation_data(obs(ii),model.basis,model.settings);
++
++    % Equation (15): y ~ N(meanY, F*F' + sigma^2*I).
++    meanY = A*muMap;
++    F = [A*Lmap, sigmaXi*B];
++    objective = @(logSigma) -log_gaussian_marginal( ...
++        y,meanY,F,exp(logSigma));
+ 
+     [logSigma,~,exitflag,output] = fminsearch( ...
+         objective,log(model.settings.noise.sigma_validation),options);
+     sigma = exp(logSigma);
+-    [negativeLogEvidence,muU,U] = validation_evidence( ...
+-        logSigma,gram,rhs,residualNorm2,numel(y));
+-    mu = mu0 + L0*muU;
+-    C = L0/U;
+-    P = C*C.';
++    [logDensity,muU,U] = log_gaussian_marginal(y,meanY,F,sigma);
++    [xi,Pxi] = validation_calibration_posterior( ...
++        muU,U,sigmaXi,numel(idxMap));
+ 
+-    idxXi = numel(idxMap)+(1:8);
+     validInfo(ii).flight_index = model.settings.idx_validation_data_set(ii);
+     validInfo(ii).sigma_validation = sigma;
+-    validInfo(ii).log_likelihood = -negativeLogEvidence;
+-    validInfo(ii).xi_front = mu(idxXi(1:4));
+-    validInfo(ii).xi_back = mu(idxXi(5:8));
+-    validInfo(ii).xi_cov = P(idxXi,idxXi);
++    validInfo(ii).log_likelihood = logDensity;
++    validInfo(ii).xi_front = xi(1:4);
++    validInfo(ii).xi_back = xi(5:8);
++    validInfo(ii).xi_cov = Pxi;
+     validInfo(ii).optimization.exitflag = exitflag;
+     validInfo(ii).optimization.output = output;
+ end
+ end
+ 
+ 
+-function [negativeLogEvidence,muU,U] = validation_evidence( ...
+-    logSigma,gram,rhs,residualNorm2,n)
+-%VALIDATION_EVIDENCE Evaluate (15a)-(15c) through shared Gaussian evidence.
++function [xi,Pxi] = validation_calibration_posterior(muU,U,sigmaXi,nMap)
++%VALIDATION_CALIBRATION_POSTERIOR Recover the new flight's calibration.
+ 
+-invSigma2 = exp(-2*logSigma);
+-[logDensity,muU,U] = log_gaussian_marginal( ...
+-    invSigma2*gram,invSigma2*rhs,invSigma2*residualNorm2, ...
+-    2*n*logSigma,n);
+-negativeLogEvidence = -logDensity;
++idxXi = nMap+(1:8);
++xi = sigmaXi*muU(idxXi);
++C = U\eye(size(U));
++Cxi = sigmaXi*C(idxXi,:);
++Pxi = Cxi*Cxi.';
+ end
+ 
+ 
+-function [H,y] = build_validation_data(obs,basis,settings)
+-%BUILD_VALIDATION_DATA Construct [A B] and stack [front; back] observations.
++function [A,B,y] = build_validation_data(obs,basis,settings)
++%BUILD_VALIDATION_DATA Construct (15b)-(15c) for one validation flight.
+ 
+ n = size(obs.y,1);
+ nMap = size(basis.map.centers,1);
+-H = zeros(2*n,nMap+8);
++A = zeros(2*n,nMap);
++B = zeros(2*n,8);
+ y = obs.y(:);
+ 
+ for kk = 1:n
+     [phiFront,phiBack,z] = get_measurement_regressors( ...
+         obs.r_ned(kk,:),obs.q(kk,:),basis,settings);
+ 
+-    H(kk,1:nMap) = phiFront;
+-    H(n+kk,1:nMap) = phiBack;
+-    H(kk,nMap+(1:4)) = [z 1];
+-    H(n+kk,nMap+(5:8)) = [z 1];
++    A(kk,:) = phiFront;
++    A(n+kk,:) = phiBack;
++    B(kk,1:4) = [z 1];
++    B(n+kk,5:8) = [z 1];
+ end
+ end
+diff --git a/utils/log_gaussian_marginal.m b/utils/log_gaussian_marginal.m
+index 6d5448b..0766dc5 100644
+--- a/utils/log_gaussian_marginal.m
++++ b/utils/log_gaussian_marginal.m
+@@ -1,22 +1,35 @@
+-function [logDensity,muU,U] = log_gaussian_marginal( ...
+-    gram,rhs,residualNorm2,logDetNoise,n)
+-%LOG_GAUSSIAN_MARGINAL Log N(y; H*mu0, R + F*F') without forming its covariance.
++function [logDensity,muU,U] = log_gaussian_marginal(y,meanY,F,noiseStd)
++%LOG_GAUSSIAN_MARGINAL Log N(y; meanY, F*F' + diag(noiseStd.^2)).
+ %
+-% For residual = y - H*mu0 and F = H*L0, supply the sufficient statistics
+-%   gram          = F'*(R\F)
+-%   rhs           = F'*(R\residual)
+-%   residualNorm2 = residual'*(R\residual)
+-%   logDetNoise   = log(det(R)).
+-% The optional outputs give the posterior of u in theta = mu0 + L0*u:
++% F is a factor of the parameter-induced covariance. A scalar noiseStd
++% gives isotropic noise; a vector allows different noise for each sample.
++% The optional outputs describe the posterior of u when
++%   y = meanY + F*u + noise,  u ~ N(0,I):
+ %   u | y ~ N(muU, inv(U'*U)).
+ 
+-p = size(gram,1);
+-precision = eye(p) + gram;
++residual = y(:) - meanY(:);
++n = numel(residual);
++noiseStd = noiseStd(:);
++if isscalar(noiseStd)
++    noiseStd = repmat(noiseStd,n,1);
++end
++if numel(y) ~= numel(meanY) || size(F,1) ~= n || ...
++        numel(noiseStd) ~= n || any(~isfinite(noiseStd)) || ...
++        any(noiseStd <= 0)
++    error('Incompatible dimensions or nonpositive measurement noise.');
++end
++
++G = F./noiseStd;
++r = residual./noiseStd;
++gram = G.'*G;
++rhs = G.'*r;
++
++precision = eye(size(F,2)) + gram;
+ precision = (precision + precision.')/2;
+ U = chol(precision,'upper');
+ muU = U\(U.'\rhs);
+ 
+-logDetCov = logDetNoise + 2*sum(log(diag(U)));
+-quadratic = residualNorm2 - rhs.'*muU;
++logDetCov = 2*sum(log(noiseStd)) + 2*sum(log(diag(U)));
++quadratic = r.'*r - rhs.'*muU;
+ logDensity = -0.5*(n*log(2*pi) + logDetCov + quadratic);
+ end

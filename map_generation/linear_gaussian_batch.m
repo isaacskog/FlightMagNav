@@ -16,9 +16,9 @@ if size(H,1) ~= numel(y) || size(H,2) ~= p || ~isequal(size(L0),[p p])
 end
 
 F = H*L0;
-residual = y - H*mu0;
-[negativeLogEvidence,muU,U] = linear_gaussian_batch_factors( ...
-    F,residual,noiseStd);
+meanY = H*mu0;
+[logDensity,muU,U] = log_gaussian_marginal(y,meanY,F,noiseStd);
+negativeLogEvidence = -logDensity;
 
 if nargout > 1
     mu = mu0 + L0*muU;
