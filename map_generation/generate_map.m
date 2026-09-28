@@ -19,14 +19,13 @@ settings=get_settings();
 model = fit_mag_map_model(data,settings);
 
 % Plot flight paths
-plot_flight_paths(data,settings)
-
+plot_flight_paths(data,settings,true)
 
 % Plot estimated map
-plot_mag_map(model)
+plot_mag_map(model,true)
 
 fprintf('Map negative log evidence: %.3f\n',model.negative_log_evidence);
 for ii = 1:numel(model.validInfo)
-    fprintf('Flight %d: validation noise %.3f nT\n', ...
+    fprintf('Flight %d: validation noise %.1f nT\n', ...
         model.validInfo(ii).flight_index,model.validInfo(ii).sigma_validation);
 end

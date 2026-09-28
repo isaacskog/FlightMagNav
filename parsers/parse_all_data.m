@@ -78,7 +78,7 @@ parfor ii = 1:nFlights
     % The time base of this system is used as the common time base for all
     % other sensors.
     % ---------------------------------------------------------------------
-    filename = fullfile(acquisitionFolder,'GPSINS.txt');
+    filename = fullfile(acquisitionFolder,'GNSSINS.txt');
 
     flightData.GNSSaidedINS = parse_gps_aided_ins_data( ...
         filename, ...

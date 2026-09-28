@@ -20,10 +20,9 @@ settings.m0 = wrldmagm( ...
 settings.map.center_spacing = 50;                                           % Spacing between the basis functions of the map [m]
 settings.map.margin = settings.map.center_spacing;                          % How much should the grid of basis function extend beyond the area covered by the flight paths
 settings.map.sigma = 50;                                                    % Prior on the basis function weights [nT]
-settings.map.length_scale =60;                              % Length scale used in the basis functions [m]
-settings.noise.sigma = [0.6 0.8 0.8 1.3]';                              % Measurement noise/model error standard deviation [nT] for the different flights 
-% Initial prior standard deviation for the eight calibration coefficients [nT].
-settings.calibration.sigma_xi = 10;
-settings.noise.sigma_validation=3;
+settings.map.length_scale =60;                                              % Length scale used in the basis functions [m]
+settings.noise.sigma = [0.6 0.8 0.8 1.3]';                                  % Measurement noise/model error standard deviation [nT] for the different flights 
+settings.calibration.sigma_xi = 10;                                         % Initial prior standard deviation for the calibration coefficients [nT].
+settings.noise.sigma_validation=3;                                          % Initial value for the noise standard deviation in optimization done in the validation 
 
 end
