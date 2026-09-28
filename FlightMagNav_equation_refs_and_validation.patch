@@ -1,0 +1,140 @@
+diff --git a/map_generation/build_batch_map_data.m b/map_generation/build_batch_map_data.m
+index c5ef823..4752ded 100644
+--- a/map_generation/build_batch_map_data.m
++++ b/map_generation/build_batch_map_data.m
+@@ -2,7 +2,7 @@ function [H,y,flightId] = build_batch_map_data(obs,basis,paramInfo,settings)
+ %BUILD_BATCH_MAP_DATA Stack all map-learning measurements and regressors.
+ %
+ % Each consecutive pair of rows corresponds to the front and back sensors
+-% at one time instant, as in the per-flight matrices in (9)-(13).
++% at one time instant, as in the per-flight matrices in (6)-(9).
+ 
+ samples = arrayfun(@(flight) size(flight.y,1),obs);
+ nRows = 2*sum(samples);
+diff --git a/map_generation/fit_mag_map_model.m b/map_generation/fit_mag_map_model.m
+index 2c0a349..80b067c 100644
+--- a/map_generation/fit_mag_map_model.m
++++ b/map_generation/fit_mag_map_model.m
+@@ -44,7 +44,7 @@ end
+ 
+ function [negativeLogEvidence,theta,P] = infer_map( ...
+     H,y,flightId,paramInfo,settings)
+-%MAP_EVIDENCE Evaluate (19) and, when requested, the posterior in (16).
++%INFER_MAP Evaluate (13b) and, when requested, the posterior in (11).
+ 
+ p = paramInfo.n_state;
+ priorStd = zeros(p,1);
+diff --git a/map_generation/get_measurement_regressors.m b/map_generation/get_measurement_regressors.m
+index 810976b..c812a0a 100644
+--- a/map_generation/get_measurement_regressors.m
++++ b/map_generation/get_measurement_regressors.m
+@@ -5,7 +5,7 @@ Rb2n_enu = quat2rotm(q);                  % Note that Xsense uses ENU. Body to N
+ Rb2n=[0 1 0; 1 0 0; 0 0 -1]*Rb2n_enu;
+ Rn2b = Rb2n';
+ 
+-% Equation (7): use the direction of the nominal field, not its magnitude.
++% Equation (4b): use the direction of the nominal field, not its magnitude.
+ m0 = settings.m0(:);
+ z = (Rn2b*(m0/norm(m0))).';
+ 
+diff --git a/map_generation/linear_gaussian_batch.m b/map_generation/linear_gaussian_batch.m
+index 55a67a1..3c1a187 100644
+--- a/map_generation/linear_gaussian_batch.m
++++ b/map_generation/linear_gaussian_batch.m
+@@ -5,7 +5,7 @@ function [negativeLogEvidence,mu,P] = linear_gaussian_batch( ...
+ %   y | theta ~ N(H*theta,diag(noiseStd.^2))
+ %   theta     ~ N(mu0,L0*L0')
+ %
+-% The result is equivalent to (16) and (19) in the paper. The factorized
++% The result is equivalent to (11) and (13b) in the paper. The factorized
+ % calculation avoids forming the large measurement covariance P_yy.
+ 
+ y = y(:);
+diff --git a/map_generation/linear_gaussian_batch_factors.m b/map_generation/linear_gaussian_batch_factors.m
+index 3d40256..1908e20 100644
+--- a/map_generation/linear_gaussian_batch_factors.m
++++ b/map_generation/linear_gaussian_batch_factors.m
+@@ -18,15 +18,7 @@ end
+ 
+ G = F./noiseStd;
+ r = residual./noiseStd;
+-p = size(F,2);
+-precision = eye(p) + G.'*G;
+-precision = (precision + precision.')/2;
+-U = chol(precision,'upper');
+-h = G.'*r;
+-muU = U\(U.'\h);
+-
+-% Determinant lemma and Woodbury identity for P_yy = R + H*P0*H'.
+-logDetPyy = 2*sum(log(noiseStd)) + 2*sum(log(diag(U)));
+-quadratic = r.'*r - h.'*muU;
+-negativeLogEvidence = 0.5*(n*log(2*pi) + logDetPyy + quadratic);
++[logDensity,muU,U] = log_gaussian_marginal( ...
++    G.'*G,G.'*r,r.'*r,2*sum(log(noiseStd)),n);
++negativeLogEvidence = -logDensity;
+ end
+diff --git a/map_generation/run_validation.m b/map_generation/run_validation.m
+index 7b0a56f..cb8cfd5 100644
+--- a/map_generation/run_validation.m
++++ b/map_generation/run_validation.m
+@@ -1,5 +1,5 @@
+ function validInfo = run_validation(model)
+-%RUN_VALIDATION Estimate effective noise on independent flights using (22).
++%RUN_VALIDATION Estimate effective noise on independent flights using (14).
+ %
+ % Each flight is evaluated separately, conditional on the learned map.
+ % The map weights and the new flight's calibration xi are marginalized
+@@ -64,19 +64,13 @@ end
+ 
+ function [negativeLogEvidence,muU,U] = validation_evidence( ...
+     logSigma,gram,rhs,residualNorm2,n)
+-%VALIDATION_EVIDENCE Apply (23) through a parameter-space Cholesky factor.
++%VALIDATION_EVIDENCE Evaluate (15a)-(15c) through shared Gaussian evidence.
+ 
+-sigma2 = exp(2*logSigma);
+-p = size(gram,1);
+-precision = eye(p) + gram/sigma2;
+-precision = (precision + precision.')/2;
+-U = chol(precision,'upper');
+-h = rhs/sigma2;
+-muU = U\(U.'\h);
+-
+-logDetPyy = n*log(sigma2) + 2*sum(log(diag(U)));
+-quadratic = residualNorm2/sigma2 - h.'*muU;
+-negativeLogEvidence = 0.5*(n*log(2*pi) + logDetPyy + quadratic);
++invSigma2 = exp(-2*logSigma);
++[logDensity,muU,U] = log_gaussian_marginal( ...
++    invSigma2*gram,invSigma2*rhs,invSigma2*residualNorm2, ...
++    2*n*logSigma,n);
++negativeLogEvidence = -logDensity;
+ end
+ 
+ 
+diff --git a/utils/log_gaussian_marginal.m b/utils/log_gaussian_marginal.m
+new file mode 100644
+index 0000000..6d5448b
+--- /dev/null
++++ b/utils/log_gaussian_marginal.m
+@@ -0,0 +1,22 @@
++function [logDensity,muU,U] = log_gaussian_marginal( ...
++    gram,rhs,residualNorm2,logDetNoise,n)
++%LOG_GAUSSIAN_MARGINAL Log N(y; H*mu0, R + F*F') without forming its covariance.
++%
++% For residual = y - H*mu0 and F = H*L0, supply the sufficient statistics
++%   gram          = F'*(R\F)
++%   rhs           = F'*(R\residual)
++%   residualNorm2 = residual'*(R\residual)
++%   logDetNoise   = log(det(R)).
++% The optional outputs give the posterior of u in theta = mu0 + L0*u:
++%   u | y ~ N(muU, inv(U'*U)).
++
++p = size(gram,1);
++precision = eye(p) + gram;
++precision = (precision + precision.')/2;
++U = chol(precision,'upper');
++muU = U\(U.'\rhs);
++
++logDetCov = logDetNoise + 2*sum(log(diag(U)));
++quadratic = residualNorm2 - rhs.'*muU;
++logDensity = -0.5*(n*log(2*pi) + logDetCov + quadratic);
++end

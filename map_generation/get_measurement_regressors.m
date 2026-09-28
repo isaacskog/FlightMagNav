@@ -5,7 +5,7 @@ Rb2n_enu = quat2rotm(q);                  % Note that Xsense uses ENU. Body to N
 Rb2n=[0 1 0; 1 0 0; 0 0 -1]*Rb2n_enu;
 Rn2b = Rb2n';
 
-% Equation (7): use the direction of the nominal field, not its magnitude.
+% Equation (4b): use the direction of the nominal field, not its magnitude.
 m0 = settings.m0(:);
 z = (Rn2b*(m0/norm(m0))).';
 

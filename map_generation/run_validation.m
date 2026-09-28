@@ -1,5 +1,5 @@
 function validInfo = run_validation(model)
-%RUN_VALIDATION Estimate effective noise on independent flights using (22).
+%RUN_VALIDATION Estimate effective noise on independent flights using (14).
 %
 % Each flight is evaluated separately, conditional on the learned map.
 % The map weights and the new flight's calibration xi are marginalized
@@ -64,19 +64,13 @@ end
 
 function [negativeLogEvidence,muU,U] = validation_evidence( ...
     logSigma,gram,rhs,residualNorm2,n)
-%VALIDATION_EVIDENCE Apply (23) through a parameter-space Cholesky factor.
+%VALIDATION_EVIDENCE Evaluate (15a)-(15c) through shared Gaussian evidence.
 
-sigma2 = exp(2*logSigma);
-p = size(gram,1);
-precision = eye(p) + gram/sigma2;
-precision = (precision + precision.')/2;
-U = chol(precision,'upper');
-h = rhs/sigma2;
-muU = U\(U.'\h);
-
-logDetPyy = n*log(sigma2) + 2*sum(log(diag(U)));
-quadratic = residualNorm2/sigma2 - h.'*muU;
-negativeLogEvidence = 0.5*(n*log(2*pi) + logDetPyy + quadratic);
+invSigma2 = exp(-2*logSigma);
+[logDensity,muU,U] = log_gaussian_marginal( ...
+    invSigma2*gram,invSigma2*rhs,invSigma2*residualNorm2, ...
+    2*n*logSigma,n);
+negativeLogEvidence = -logDensity;
 end
 
 

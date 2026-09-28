@@ -5,7 +5,7 @@ function [negativeLogEvidence,mu,P] = linear_gaussian_batch( ...
 %   y | theta ~ N(H*theta,diag(noiseStd.^2))
 %   theta     ~ N(mu0,L0*L0')
 %
-% The result is equivalent to (16) and (19) in the paper. The factorized
+% The result is equivalent to (11) and (13b) in the paper. The factorized
 % calculation avoids forming the large measurement covariance P_yy.
 
 y = y(:);

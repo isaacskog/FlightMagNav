@@ -18,15 +18,7 @@ end
 
 G = F./noiseStd;
 r = residual./noiseStd;
-p = size(F,2);
-precision = eye(p) + G.'*G;
-precision = (precision + precision.')/2;
-U = chol(precision,'upper');
-h = G.'*r;
-muU = U\(U.'\h);
-
-% Determinant lemma and Woodbury identity for P_yy = R + H*P0*H'.
-logDetPyy = 2*sum(log(noiseStd)) + 2*sum(log(diag(U)));
-quadratic = r.'*r - h.'*muU;
-negativeLogEvidence = 0.5*(n*log(2*pi) + logDetPyy + quadratic);
+[logDensity,muU,U] = log_gaussian_marginal( ...
+    G.'*G,G.'*r,r.'*r,2*sum(log(noiseStd)),n);
+negativeLogEvidence = -logDensity;
 end

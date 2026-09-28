@@ -2,7 +2,7 @@ function [H,y,flightId] = build_batch_map_data(obs,basis,paramInfo,settings)
 %BUILD_BATCH_MAP_DATA Stack all map-learning measurements and regressors.
 %
 % Each consecutive pair of rows corresponds to the front and back sensors
-% at one time instant, as in the per-flight matrices in (9)-(13).
+% at one time instant, as in the per-flight matrices in (6)-(9).
 
 samples = arrayfun(@(flight) size(flight.y,1),obs);
 nRows = 2*sum(samples);

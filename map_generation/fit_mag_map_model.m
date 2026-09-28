@@ -44,7 +44,7 @@ end
 
 function [negativeLogEvidence,theta,P] = infer_map( ...
     H,y,flightId,paramInfo,settings)
-%MAP_EVIDENCE Evaluate (19) and, when requested, the posterior in (16).
+%INFER_MAP Evaluate (13b) and, when requested, the posterior in (11).
 
 p = paramInfo.n_state;
 priorStd = zeros(p,1);
