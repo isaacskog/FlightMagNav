@@ -1,7 +1,7 @@
 function [Phi_front,Phi_back,z] = get_measurement_regressors(r_ned,q,basis,settings)
 
-% Get rotation matrices
-Rb2n_enu = quat2rotm(q);                  % Note that Xsense uses ENU. Body to Navigation frame 
+% Xsens orientation transforms from the body frame to ENU.
+Rb2n_enu = local_quat_to_rotm(q);
 Rb2n=[0 1 0; 1 0 0; 0 0 -1]*Rb2n_enu;
 Rn2b = Rb2n';
 
@@ -17,4 +17,20 @@ r_back  = r_ned + (Rb2n*settings.pos_back_mag(:)).';
 Phi_front = spatial_rbf_2d(r_front(1:2),basis.map.centers,basis.map.length_scale);
 Phi_back  = spatial_rbf_2d(r_back(1:2), basis.map.centers,basis.map.length_scale);
 
+end
+
+
+function R = local_quat_to_rotm(q)
+%LOCAL_QUAT_TO_ROTM Rotation matrix for a scalar-first quaternion [w x y z].
+
+q = q(:).';
+if numel(q) ~= 4 || any(~isfinite(q)) || norm(q) == 0
+    error('Expected a finite, nonzero quaternion [w x y z].');
+end
+q = q/norm(q);
+w = q(1); x = q(2); y = q(3); z = q(4);
+
+R = [1-2*(y^2+z^2), 2*(x*y-w*z),   2*(x*z+w*y); ...
+     2*(x*y+w*z),   1-2*(x^2+z^2), 2*(y*z-w*x); ...
+     2*(x*z-w*y),   2*(y*z+w*x),   1-2*(x^2+y^2)];
 end
